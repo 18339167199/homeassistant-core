@@ -1,0 +1,11 @@
+{
+  "domain": "ewelink_iot",
+  "name": "eWeLink IoT",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/ewelink_iot",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "quality_scale": "bronze",
+  "requirements": []
+}
