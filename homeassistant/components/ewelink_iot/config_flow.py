@@ -2,26 +2,32 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.const import CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import EWeLinkApiClient, EWeLinkAuthError, EWeLinkConnectionError
+from .api import (
+    EWeLinkAccountNotExist,
+    EWeLinkApiClient,
+    EWeLinkAuthError,
+    EWeLinkConnectionError,
+)
 from .const import (
-    CONF_APP_ID,
-    CONF_APP_SECRET,
+    APP_ID,
+    APP_SECRET,
+    CONF_ACCOUNT,
+    CONF_COUNTRY_CODE,
     CONF_REGION,
-    DEFAULT_APP_ID,
-    DEFAULT_APP_SECRET,
-    DEFAULT_REGION,
+    DEV_MODE,
     DOMAIN,
-    REGIONS,
+    REGION_DEFAULT,
+    REGIONS_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,42 +43,46 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
+        _LOGGER.info("DEV_MODE: %s", DEV_MODE)
+
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            _LOGGER.info("User input: %s", json.dumps(user_input))
+
             try:
                 # Create API client and test login
                 session = async_get_clientsession(self.hass)
                 api_client = EWeLinkApiClient(
                     session=session,
-                    email=user_input[CONF_EMAIL],
+                    account=user_input[CONF_ACCOUNT],
                     password=user_input[CONF_PASSWORD],
-                    app_id=user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
-                    app_secret=user_input.get(CONF_APP_SECRET, DEFAULT_APP_SECRET),
-                    region=user_input.get(CONF_REGION, DEFAULT_REGION),
+                    country_code=user_input[CONF_REGION],
+                    app_id=APP_ID,
+                    app_secret=APP_SECRET,
                 )
 
                 # Attempt to login
                 user_data = await api_client.login()
+                _LOGGER.info("In config flow get user data")
+                _LOGGER.info(json.dumps(user_data))
 
                 # Use user email as unique ID
-                await self.async_set_unique_id(user_input[CONF_EMAIL].lower())
+                await self.async_set_unique_id(user_input[CONF_ACCOUNT].lower())
                 self._abort_if_unique_id_configured()
 
                 # Create config entry
                 return self.async_create_entry(
-                    title=user_input[CONF_EMAIL],
+                    title=user_input[CONF_ACCOUNT],
                     data={
-                        CONF_EMAIL: user_input[CONF_EMAIL],
+                        CONF_ACCOUNT: user_input[CONF_ACCOUNT],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        CONF_APP_ID: user_input.get(CONF_APP_ID, DEFAULT_APP_ID),
-                        CONF_APP_SECRET: user_input.get(
-                            CONF_APP_SECRET, DEFAULT_APP_SECRET
-                        ),
-                        CONF_REGION: user_input.get(CONF_REGION, DEFAULT_REGION),
+                        CONF_REGION: user_input.get(CONF_REGION, REGION_DEFAULT),
                     },
                 )
 
+            except EWeLinkAccountNotExist:
+                errors["base"] = "user_not_exist"
             except EWeLinkAuthError:
                 errors["base"] = "invalid_auth"
             except EWeLinkConnectionError:
@@ -81,14 +91,19 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error during login")
                 errors["base"] = "unknown"
 
+        # format region map to options
+        regions_options = {
+            item[CONF_COUNTRY_CODE]: item[CONF_COUNTRY_CODE] for item in REGIONS_MAP
+        }
+
         # Show form
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_EMAIL): str,
+                vol.Required(CONF_REGION, default=REGION_DEFAULT): vol.In(
+                    regions_options.keys()
+                ),
+                vol.Required(CONF_ACCOUNT): str,
                 vol.Required(CONF_PASSWORD): str,
-                vol.Optional(CONF_REGION, default=DEFAULT_REGION): vol.In(REGIONS),
-                vol.Optional(CONF_APP_ID, default=DEFAULT_APP_ID): str,
-                vol.Optional(CONF_APP_SECRET, default=DEFAULT_APP_SECRET): str,
             }
         )
 
@@ -115,13 +130,9 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 session = async_get_clientsession(self.hass)
                 api_client = EWeLinkApiClient(
                     session=session,
-                    email=reauth_entry.data[CONF_EMAIL],
+                    email=reauth_entry.data[CONF_ACCOUNT],
                     password=user_input[CONF_PASSWORD],
-                    app_id=reauth_entry.data.get(CONF_APP_ID, DEFAULT_APP_ID),
-                    app_secret=reauth_entry.data.get(
-                        CONF_APP_SECRET, DEFAULT_APP_SECRET
-                    ),
-                    region=reauth_entry.data.get(CONF_REGION, DEFAULT_REGION),
+                    region=reauth_entry.data.get(CONF_REGION, REGION_DEFAULT),
                 )
 
                 await api_client.login()
@@ -144,5 +155,5 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             errors=errors,
-            description_placeholders={"email": reauth_entry.data[CONF_EMAIL]},
+            description_placeholders={"email": reauth_entry.data[CONF_ACCOUNT]},
         )

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 import json
 import logging
 from typing import Any
 
 import aiohttp
 
-from .const import WS_BASE_URL
+from .const import EWELINK_WS_API
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class EWeLinkWebSocketClient:
             _LOGGER.debug("Connecting to eWeLink WebSocket")
 
             self._ws = await self._session.ws_connect(
-                WS_BASE_URL,
+                EWELINK_WS_API,
                 timeout=aiohttp.ClientTimeout(total=30),
             )
 
@@ -61,7 +62,7 @@ class EWeLinkWebSocketClient:
 
             _LOGGER.info("Connected to eWeLink WebSocket")
 
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             _LOGGER.error("Failed to connect to WebSocket: %s", err)
             self._is_connected = False
             # Schedule reconnection
@@ -102,8 +103,8 @@ class EWeLinkWebSocketClient:
 
         except asyncio.CancelledError:
             _LOGGER.debug("WebSocket listen task cancelled")
-        except Exception as err:
-            _LOGGER.exception("Error in WebSocket listen: %s", err)
+        except Exception:
+            _LOGGER.exception("Error in WebSocket listen")
         finally:
             self._is_connected = False
             if self._should_reconnect:
@@ -128,8 +129,8 @@ class EWeLinkWebSocketClient:
 
         except json.JSONDecodeError:
             _LOGGER.error("Failed to decode WebSocket message: %s", message)
-        except Exception as err:
-            _LOGGER.exception("Error handling WebSocket message: %s", err)
+        except Exception:
+            _LOGGER.exception("Error handling WebSocket message")
 
     def register_callback(
         self, device_id: str, callback: Callable[[dict[str, Any]], None]
@@ -169,20 +170,15 @@ class EWeLinkWebSocketClient:
     async def disconnect(self) -> None:
         """Disconnect from WebSocket server."""
         self._should_reconnect = False
-
         if self._listen_task and not self._listen_task.done():
             self._listen_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listen_task
-            except asyncio.CancelledError:
-                pass
 
         if self._reconnect_task and not self._reconnect_task.done():
             self._reconnect_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reconnect_task
-            except asyncio.CancelledError:
-                pass
 
         if self._ws and not self._ws.closed:
             await self._ws.close()

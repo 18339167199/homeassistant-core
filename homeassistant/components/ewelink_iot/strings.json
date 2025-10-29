@@ -5,7 +5,7 @@
         "title": "Connect to eWeLink IoT",
         "description": "Enter your eWeLink account credentials",
         "data": {
-          "email": "Email",
+          "account": "Account",
           "password": "Password",
           "region": "Region",
           "app_id": "App ID (optional)",
@@ -23,7 +23,8 @@
     "error": {
       "invalid_auth": "Invalid email or password",
       "cannot_connect": "Cannot connect to eWeLink servers",
-      "unknown": "An unexpected error occurred"
+      "unknown": "An unexpected error occurred",
+      "user_not_exist": "User account not exist"
     },
     "abort": {
       "already_configured": "This account is already configured"

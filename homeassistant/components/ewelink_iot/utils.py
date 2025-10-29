@@ -1,0 +1,22 @@
+"""Common utils."""
+
+import random
+import re
+import string
+
+from .const import RE_EMAIL_PATTREN
+
+
+def is_valid_email(input: str) -> bool:
+    """Valid input is email format."""
+    return bool(re.fullmatch(RE_EMAIL_PATTREN, input))
+
+
+def gen_random_str(len=8, charsets: None | list = None) -> str:
+    """Randomly generate a string of several characters, which defaults to numbers and lowercase letters."""
+    if len < 0:
+        return ""
+
+    default_charsets = string.digits + string.ascii_lowercase
+    _charsets = charsets if charsets is list and len(charsets) > 0 else default_charsets
+    return "".join(random.choice(_charsets) for _ in range(len))

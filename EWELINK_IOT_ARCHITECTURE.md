@@ -1,4 +1,5 @@
 # eWeLink IoT 集成架构设计
+启动开发环境下 HA：HA_DEV_MODE=1 python -m homeassistant -c ./config
 
 ## 系统架构概览
 

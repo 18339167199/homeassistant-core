@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-import asyncio
+import base64
 from dataclasses import dataclass
+from enum import StrEnum
 import hashlib
 import hmac
 import json
 import logging
-import time
 from typing import Any
 
 import aiohttp
 
-from .const import API_BASE_URL
+from homeassistant.const import CONF_PASSWORD
+
+from .const import DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
+from .utils import gen_random_str, is_valid_email
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,12 +35,25 @@ class EWeLinkDevice:
     tags: dict[str, Any]
 
 
+class RequestMethod(StrEnum):
+    """Request method of http."""
+
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    DELETE = "DELETE"
+
+
 class EWeLinkApiError(Exception):
     """Base exception for eWeLink API errors."""
 
 
 class EWeLinkAuthError(EWeLinkApiError):
     """Exception raised for authentication errors."""
+
+
+class EWeLinkAccountNotExist(EWeLinkApiError):
+    """Exception rasied for eWeLink account not exist."""
 
 
 class EWeLinkConnectionError(EWeLinkApiError):
@@ -50,95 +66,118 @@ class EWeLinkApiClient:
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        email: str,
+        account: str,
         password: str,
+        country_code: str,
         app_id: str,
         app_secret: str,
-        region: str = "cn",
     ) -> None:
         """Initialize the API client."""
         self._session = session
-        self._email = email
+        self._account = account
         self._password = password
         self._app_id = app_id
         self._app_secret = app_secret
-        self._region = region
+        self._country_code = country_code
+        self._api_key = app_id
+        self._app_secret = app_secret
+        self._api_base_url = self.__get_api_base_url()
         self._access_token: str | None = None
-        self._user_id: str | None = None
-        self._api_key: str | None = None
+        _LOGGER.info("EWeLinkApiClient init api_url: %s", self._api_base_url)
 
-    def _generate_sign(self, params: dict[str, Any]) -> str:
+    def __get_api_base_url(self):
+        """Get eWeLink api base url."""
+        if DEV_MODE:
+            return EWELINK_API_MAP[REGION_CN]
+
+        regions = [
+            item["region"]
+            for item in REGIONS_MAP
+            if item["countryCode"] == self._country_code
+        ]
+        return EWELINK_API_MAP[regions[0]] if len(regions) > 0 else None
+
+    def __generate_sign(
+        self, request_method: RequestMethod, params: dict[str, Any]
+    ) -> str:
         """Generate signature for API request."""
-        # Sort parameters and create signature string
-        sorted_params = sorted(params.items())
-        sign_str = ""
-        for key, value in sorted_params:
-            sign_str += f"{key}={value}&"
-        sign_str = sign_str.rstrip("&")
+        message = ""
+        if request_method == RequestMethod.GET:
+            key_list = sorted(params.keys())
+            for key in key_list:
+                if message == "":
+                    message += params[key]
+                else:
+                    message += f"&{params[key]}"
+        else:
+            message = json.dumps(params)
 
-        # Generate HMAC-SHA256 signature
-        signature = hmac.new(
-            self._app_secret.encode(),
-            sign_str.encode(),
-            hashlib.sha256,
-        ).hexdigest()
+        sha256 = hmac.new(
+            self._api_key.encode(), message.encode(), digestmod=hashlib.sha256
+        )
+        return f"Sign {(base64.b64encode(sha256.digest())).decode()}"
 
-        return signature
-
-    def _get_headers(self, with_auth: bool = True) -> dict[str, str]:
+    def __get_headers(
+        self, request_method: RequestMethod, params: dict[str, Any]
+    ) -> dict[str, str]:
         """Get headers for API request."""
-        headers = {
-            "Content-Type": "application/json",
+
+        return {
+            "Content-Type": "application/json; charset=utf-8",
             "X-CK-Appid": self._app_id,
+            "X-CK-Nonce": gen_random_str(8),
+            "Authorization": self.__generate_sign(
+                request_method=request_method, params=params
+            ),
         }
-
-        if with_auth and self._access_token:
-            headers["Authorization"] = f"Bearer {self._access_token}"
-
-        return headers
 
     async def login(self) -> dict[str, Any]:
         """Login to eWeLink and get access token."""
-        url = f"{API_BASE_URL}/user/login"
+        params = {"countryCode": self._country_code, CONF_PASSWORD: self._password}
+        if is_valid_email(self._account):
+            params["email"] = self._account
+        else:
+            params["phoneNumber"] = f"{self._country_code}{self._account}"
 
-        # Prepare request parameters
-        timestamp = int(time.time() * 1000)
-        params = {
-            "email": self._email,
-            "password": self._password,
-            "countryCode": "+86" if self._region == "cn" else "+1",
-        }
-
-        headers = self._get_headers(with_auth=False)
+        _LOGGER.info("Login params: %s", json.dumps(params))
 
         try:
             async with self._session.post(
-                url,
+                url=f"{self._api_base_url}/v2/user/login",
                 json=params,
-                headers=headers,
+                headers=self.__get_headers(
+                    request_method=RequestMethod.POST, params=params
+                ),
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 data = await response.json()
+                _LOGGER.info("Logion response json: %s", json.dumps(data))
 
-                if data.get("error") != 0:
+                error = data.get("error")
+                if error != 0:
                     error_msg = data.get("msg", "Unknown error")
-                    if data.get("error") in (400, 401, 403):
+                    if error in (400, 401, 403, 10001, 10014):
                         raise EWeLinkAuthError(f"Authentication failed: {error_msg}")
+                    if error == 10003:
+                        raise EWeLinkAccountNotExist(
+                            f"User account not exist: {error_msg}"
+                        )
                     raise EWeLinkApiError(f"Login failed: {error_msg}")
 
                 # Extract authentication data
                 user_data = data.get("data", {}).get("user", {})
                 self._access_token = data.get("data", {}).get("at")
-                self._user_id = user_data.get("apikey")
                 self._api_key = user_data.get("apikey")
 
-                _LOGGER.debug("Successfully logged in to eWeLink")
+                _LOGGER.info("Successfully logged in to eWeLink")
 
                 return data.get("data", {})
 
         except aiohttp.ClientError as err:
+            _LOGGER.error("Error happen 1 %s", err)
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
+            _LOGGER.error("Error happen 2 %s", err)
             raise EWeLinkConnectionError("Request timeout") from err
 
     async def get_devices(self) -> list[EWeLinkDevice]:
@@ -146,8 +185,8 @@ class EWeLinkApiClient:
         if not self._access_token:
             await self.login()
 
-        url = f"{API_BASE_URL}/device/thing"
-        headers = self._get_headers()
+        url = f"{self._api_base_url}/device/thing"
+        headers = self.__get_headers()
 
         params = {
             "num": 0,  # 0 means get all devices
@@ -188,13 +227,13 @@ class EWeLinkApiClient:
                     )
                     devices.append(device)
 
-                _LOGGER.debug("Retrieved %d devices from eWeLink", len(devices))
+                _LOGGER.info("Retrieved %d devices from eWeLink", len(devices))
 
                 return devices
 
         except aiohttp.ClientError as err:
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
 
     async def set_device_status(
@@ -204,8 +243,8 @@ class EWeLinkApiClient:
         if not self._access_token:
             await self.login()
 
-        url = f"{API_BASE_URL}/device/thing/status"
-        headers = self._get_headers()
+        url = f"{self._api_base_url}/device/thing/status"
+        headers = self.__get_headers()
 
         payload = {
             "type": 1,
@@ -230,20 +269,5 @@ class EWeLinkApiClient:
 
         except aiohttp.ClientError as err:
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
-
-    @property
-    def user_id(self) -> str | None:
-        """Return user ID."""
-        return self._user_id
-
-    @property
-    def api_key(self) -> str | None:
-        """Return API key."""
-        return self._api_key
-
-    @property
-    def access_token(self) -> str | None:
-        """Return access token."""
-        return self._access_token
