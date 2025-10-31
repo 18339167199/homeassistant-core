@@ -18,8 +18,8 @@ EWELINK_API_EU: Final = "https://eu-apia.coolkit.cc"
 EWELINK_API_IR: Final = "https://ir-apia.coolkit.cc"
 EWELINK_API_TEST: Final = "https://test-apia.coolkit.cn"
 EWELINK_WS_API: Final = "wss://api.ewelink.cc:8080/api/ws"
-APP_ID: Final = "HyeXzioQe4gpfvTS"
-APP_SECRET: Final = "KCLh*HfIik$CWf1M@^%TFit45eq9Ha@w"
+APP_ID: Final = "oc3tvAdJPmaVOKrLv0rjCC0dzub4bbnD"
+APP_SECRET: Final = "V0LmoW0cd2cg38i1eIM0P5Z29GjES4PA"
 
 # Config entry keys
 CONF_ACCOUNT: Final = "account"

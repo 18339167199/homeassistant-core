@@ -13,10 +13,15 @@ def is_valid_email(input: str) -> bool:
 
 
 def gen_random_str(len=8, charsets: None | list = None) -> str:
-    """Randomly generate a string of several characters, which defaults to numbers and lowercase letters."""
+    """Randomly generate a string of several characters, which defaults to numbers and lowercase letters and uppercase letters."""
     if len < 0:
         return ""
 
-    default_charsets = string.digits + string.ascii_lowercase
+    default_charsets = string.digits + string.ascii_lowercase + string.ascii_uppercase
     _charsets = charsets if charsets is list and len(charsets) > 0 else default_charsets
     return "".join(random.choice(_charsets) for _ in range(len))
+
+
+def gen_config_flow_id(account: str) -> str:
+    """Gen config flow unique id."""
+    return f"ewelink_lot_{account}"

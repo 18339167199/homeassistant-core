@@ -63,6 +63,15 @@ class EWeLinkConnectionError(EWeLinkApiError):
 class EWeLinkApiClient:
     """eWeLink IoT API client."""
 
+    _instance: EWeLinkApiClient | None = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        """Singleton for api client."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(
         self,
         session: aiohttp.ClientSession,
@@ -73,17 +82,18 @@ class EWeLinkApiClient:
         app_secret: str,
     ) -> None:
         """Initialize the API client."""
-        self._session = session
-        self._account = account
-        self._password = password
-        self._app_id = app_id
-        self._app_secret = app_secret
-        self._country_code = country_code
-        self._api_key = app_id
-        self._app_secret = app_secret
-        self._api_base_url = self.__get_api_base_url()
-        self._access_token: str | None = None
-        _LOGGER.info("EWeLinkApiClient init api_url: %s", self._api_base_url)
+        if not self._initialized:
+            self.__session = session
+            self.__account = account
+            self.__password = password
+            self.__app_id = app_id
+            self.__country_code = country_code
+            self.__app_id = app_id
+            self.__app_secret = app_secret
+            self.__api_base_url = self.__get_api_base_url()
+            self.__access_token = ""
+            self._initialized = True
+            _LOGGER.info("EWeLinkApiClient init api_url: %s", self.__api_base_url)
 
     def __get_api_base_url(self):
         """Get eWeLink api base url."""
@@ -93,61 +103,61 @@ class EWeLinkApiClient:
         regions = [
             item["region"]
             for item in REGIONS_MAP
-            if item["countryCode"] == self._country_code
+            if item["countryCode"] == self.__country_code
         ]
         return EWELINK_API_MAP[regions[0]] if len(regions) > 0 else None
 
-    def __generate_sign(
+    def __generate_auth(
         self, request_method: RequestMethod, params: dict[str, Any]
     ) -> str:
         """Generate signature for API request."""
+        if self.__access_token:
+            return f"Bearer {self.__access_token}"
+
         message = ""
         if request_method == RequestMethod.GET:
-            key_list = sorted(params.keys())
-            for key in key_list:
-                if message == "":
-                    message += params[key]
-                else:
-                    message += f"&{params[key]}"
+            sorted_key_list = sorted(params.keys())
+            message = "&".join([f"{key}={params[key]}" for key in sorted_key_list])
         else:
-            message = json.dumps(params)
+            message = json.dumps(params, separators=(",", ":"))
 
         sha256 = hmac.new(
-            self._api_key.encode(), message.encode(), digestmod=hashlib.sha256
-        )
-        return f"Sign {(base64.b64encode(sha256.digest())).decode()}"
+            self.__app_secret.encode(), message.encode(), digestmod=hashlib.sha256
+        ).digest()
+
+        return f"Sign {(base64.b64encode(sha256)).decode()}"
 
     def __get_headers(
         self, request_method: RequestMethod, params: dict[str, Any]
     ) -> dict[str, str]:
         """Get headers for API request."""
 
+        auth = self.__generate_auth(request_method, params)
+        _LOGGER.info("Params is %s, auth is %s", json.dumps(params), auth)
+
         return {
-            "Content-Type": "application/json; charset=utf-8",
-            "X-CK-Appid": self._app_id,
+            "X-CK-Appid": self.__app_id,
             "X-CK-Nonce": gen_random_str(8),
-            "Authorization": self.__generate_sign(
-                request_method=request_method, params=params
-            ),
+            "Authorization": auth,
+            "Content-Type": "application/json",
         }
 
     async def login(self) -> dict[str, Any]:
         """Login to eWeLink and get access token."""
-        params = {"countryCode": self._country_code, CONF_PASSWORD: self._password}
-        if is_valid_email(self._account):
-            params["email"] = self._account
+        params = {"countryCode": self.__country_code, CONF_PASSWORD: self.__password}
+        if is_valid_email(self.__account):
+            params["email"] = self.__account
         else:
-            params["phoneNumber"] = f"{self._country_code}{self._account}"
+            params["phoneNumber"] = f"{self.__country_code}{self.__account}"
 
-        _LOGGER.info("Login params: %s", json.dumps(params))
+        headers = self.__get_headers(RequestMethod.POST, params)
+        _LOGGER.info("Header is %s", json.dumps(headers))
 
         try:
-            async with self._session.post(
-                url=f"{self._api_base_url}/v2/user/login",
+            async with self.__session.post(
+                url=f"{self.__api_base_url}/v2/user/login",
                 json=params,
-                headers=self.__get_headers(
-                    request_method=RequestMethod.POST, params=params
-                ),
+                headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 data = await response.json()
@@ -166,8 +176,8 @@ class EWeLinkApiClient:
 
                 # Extract authentication data
                 user_data = data.get("data", {}).get("user", {})
-                self._access_token = data.get("data", {}).get("at")
-                self._api_key = user_data.get("apikey")
+                self.__access_token = data.get("data", {}).get("at")
+                self.__app_id = user_data.get("apikey")
 
                 _LOGGER.info("Successfully logged in to eWeLink")
 
@@ -182,10 +192,10 @@ class EWeLinkApiClient:
 
     async def get_devices(self) -> list[EWeLinkDevice]:
         """Get all devices from eWeLink account."""
-        if not self._access_token:
+        if not self.__access_token:
             await self.login()
 
-        url = f"{self._api_base_url}/device/thing"
+        url = f"{self.__api_base_url}/device/thing"
         headers = self.__get_headers()
 
         params = {
@@ -193,7 +203,7 @@ class EWeLinkApiClient:
         }
 
         try:
-            async with self._session.get(
+            async with self.__session.get(
                 url,
                 params=params,
                 headers=headers,
@@ -240,10 +250,10 @@ class EWeLinkApiClient:
         self, device_id: str, params: dict[str, Any]
     ) -> dict[str, Any]:
         """Set device status."""
-        if not self._access_token:
+        if not self.__access_token:
             await self.login()
 
-        url = f"{self._api_base_url}/device/thing/status"
+        url = f"{self.__api_base_url}/device/thing/status"
         headers = self.__get_headers()
 
         payload = {
@@ -253,7 +263,7 @@ class EWeLinkApiClient:
         }
 
         try:
-            async with self._session.post(
+            async with self.__session.post(
                 url,
                 json=payload,
                 headers=headers,
@@ -271,3 +281,13 @@ class EWeLinkApiClient:
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
         except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
+
+    @classmethod
+    def get_instance(cls):
+        """Get api client instance."""
+        return cls._instance
+
+    @property
+    def session(self):
+        """Get aiohttp seesion object."""
+        return self.__session

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -29,6 +28,7 @@ from .const import (
     REGION_DEFAULT,
     REGIONS_MAP,
 )
+from .utils import gen_config_flow_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,8 +48,6 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            _LOGGER.info("User input: %s", json.dumps(user_input))
-
             try:
                 # Create API client and test login
                 session = async_get_clientsession(self.hass)
@@ -64,23 +62,20 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 # Attempt to login
                 user_data = await api_client.login()
-                _LOGGER.info("In config flow get user data")
-                _LOGGER.info(json.dumps(user_data))
 
-                # Use user email as unique ID
-                await self.async_set_unique_id(user_input[CONF_ACCOUNT].lower())
+                # Use user account as unique ID
+                await self.async_set_unique_id(
+                    gen_config_flow_id(user_input[CONF_ACCOUNT].lower())
+                )
+
+                # If the unique ID has been configured, the current config flow is discarded to prevent configuration reset.
                 self._abort_if_unique_id_configured()
 
                 # Create config entry
                 return self.async_create_entry(
                     title=user_input[CONF_ACCOUNT],
-                    data={
-                        CONF_ACCOUNT: user_input[CONF_ACCOUNT],
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        CONF_REGION: user_input.get(CONF_REGION, REGION_DEFAULT),
-                    },
+                    data={"user_input": user_input, "user_data": user_data},
                 )
-
             except EWeLinkAccountNotExist:
                 errors["base"] = "user_not_exist"
             except EWeLinkAuthError:
@@ -128,6 +123,8 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 # Test new credentials
                 session = async_get_clientsession(self.hass)
+
+                # create api client
                 api_client = EWeLinkApiClient(
                     session=session,
                     email=reauth_entry.data[CONF_ACCOUNT],
@@ -135,6 +132,7 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                     region=reauth_entry.data.get(CONF_REGION, REGION_DEFAULT),
                 )
 
+                # login with user account
                 await api_client.login()
 
                 # Update config entry
