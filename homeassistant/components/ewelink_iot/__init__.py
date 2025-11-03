@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -26,24 +25,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> b
     _LOGGER.info(api_client)
 
     # Create WebSocket client
-    # ws_client = EWeLinkWebSocketClient(
-    #     session=session,
-    #     api_key=api_client.api_key or "",
-    #     access_token=api_client.access_token or "",
-    #     user_id=api_client.user_id or "",
-    # )
+    ws_client = EWeLinkWebSocketClient(
+        session=api_client.session,
+        api_key=api_client.api_key or "",
+        access_token=api_client.access_token or "",
+        user_id=api_client.account or "",
+    )
 
     # # Create coordinator
-    # coordinator = EWeLinkDataCoordinator(hass, api_client, ws_client, entry)
+    coordinator = EWeLinkDataCoordinator(hass, api_client, ws_client, entry)
 
     # # Store coordinator in runtime data
-    # entry.runtime_data = coordinator
+    entry.runtime_data = coordinator
 
     # # Setup coordinator
-    # await coordinator.async_setup()
+    await coordinator.async_setup()
 
     # Setup platforms
-    # await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 

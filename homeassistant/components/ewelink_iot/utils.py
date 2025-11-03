@@ -25,3 +25,15 @@ def gen_random_str(len=8, charsets: None | list = None) -> str:
 def gen_config_flow_id(account: str) -> str:
     """Gen config flow unique id."""
     return f"ewelink_lot_{account}"
+
+
+def deep_get(data: dict, path: list[str], default=None):
+    """Deep get a dict property."""
+    current = data
+    for key in path:
+        if not isinstance(current, dict):
+            return default
+        if key not in current:
+            return default
+        current = current[key]
+    return current

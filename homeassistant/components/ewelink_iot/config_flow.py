@@ -51,6 +51,7 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 # Create API client and test login
                 session = async_get_clientsession(self.hass)
+
                 api_client = EWeLinkApiClient(
                     session=session,
                     account=user_input[CONF_ACCOUNT],
@@ -76,6 +77,7 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                     title=user_input[CONF_ACCOUNT],
                     data={"user_input": user_input, "user_data": user_data},
                 )
+
             except EWeLinkAccountNotExist:
                 errors["base"] = "user_not_exist"
             except EWeLinkAuthError:

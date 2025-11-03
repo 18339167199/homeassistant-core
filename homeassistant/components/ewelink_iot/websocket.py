@@ -19,6 +19,16 @@ _LOGGER = logging.getLogger(__name__)
 class EWeLinkWebSocketClient:
     """eWeLink IoT WebSocket client for real-time updates."""
 
+    _instance: EWeLinkWebSocketClient | None = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        """Singleton for websocket client."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._initialized = True
+        return cls._instance
+
     def __init__(
         self,
         session: aiohttp.ClientSession,
@@ -27,16 +37,18 @@ class EWeLinkWebSocketClient:
         user_id: str,
     ) -> None:
         """Initialize the WebSocket client."""
-        self._session = session
-        self._api_key = api_key
-        self._access_token = access_token
-        self._user_id = user_id
-        self._ws: aiohttp.ClientWebSocketResponse | None = None
-        self._callbacks: dict[str, list[Callable[[dict[str, Any]], None]]] = {}
-        self._listen_task: asyncio.Task | None = None
-        self._reconnect_task: asyncio.Task | None = None
-        self._is_connected = False
-        self._should_reconnect = True
+        if not self._initialized:
+            self._session = session
+            self._api_key = api_key
+            self._access_token = access_token
+            self._user_id = user_id
+            self._ws: aiohttp.ClientWebSocketResponse | None = None
+            self._callbacks: dict[str, list[Callable[[dict[str, Any]], None]]] = {}
+            self._listen_task: asyncio.Task | None = None
+            self._reconnect_task: asyncio.Task | None = None
+            self._is_connected = False
+            self._should_reconnect = True
+            self._initialized = True
 
     async def connect(self) -> None:
         """Connect to WebSocket server."""
@@ -185,6 +197,11 @@ class EWeLinkWebSocketClient:
 
         self._is_connected = False
         _LOGGER.info("Disconnected from eWeLink WebSocket")
+
+    @classmethod
+    def get_instance(cls):
+        """Get websocket client instance."""
+        return cls._instance
 
     @property
     def is_connected(self) -> bool:

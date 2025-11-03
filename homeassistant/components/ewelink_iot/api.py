@@ -16,7 +16,7 @@ import aiohttp
 from homeassistant.const import CONF_PASSWORD
 
 from .const import DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
-from .utils import gen_random_str, is_valid_email
+from .utils import deep_get, gen_random_str, is_valid_email
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +92,7 @@ class EWeLinkApiClient:
             self.__app_secret = app_secret
             self.__api_base_url = self.__get_api_base_url()
             self.__access_token = ""
+            self.__user_data = {}
             self._initialized = True
             _LOGGER.info("EWeLinkApiClient init api_url: %s", self.__api_base_url)
 
@@ -180,8 +181,8 @@ class EWeLinkApiClient:
                 self.__app_id = user_data.get("apikey")
 
                 _LOGGER.info("Successfully logged in to eWeLink")
-
-                return data.get("data", {})
+                self.__user_data = data.get("data", {})
+                return self.__user_data
 
         except aiohttp.ClientError as err:
             _LOGGER.error("Error happen 1 %s", err)
@@ -189,6 +190,25 @@ class EWeLinkApiClient:
         except TimeoutError as err:
             _LOGGER.error("Error happen 2 %s", err)
             raise EWeLinkConnectionError("Request timeout") from err
+
+    async def get_family(self):
+        """Get user family data."""
+        try:
+            if not self.__access_token:
+                await self.login()
+
+            async with self.__session.get(
+                url=f"{self.__api_base_url}/v2/family"
+            ) as response:
+                data: dict = await response.json()
+                _LOGGER.info("Get family json %s", json.dumps(data))
+                return data
+        except aiohttp.ClientError as err:
+            _LOGGER.error("Get famility aiohttp.ClientError happen %s", err)
+        except TimeoutError as err:
+            _LOGGER.error("Get famility timeout %s", err)
+        except EWeLinkApiError as err:
+            _LOGGER.error(err)
 
     async def get_devices(self) -> list[EWeLinkDevice]:
         """Get all devices from eWeLink account."""
@@ -291,3 +311,33 @@ class EWeLinkApiClient:
     def session(self):
         """Get aiohttp seesion object."""
         return self.__session
+
+    @property
+    def api_key(self) -> str | None:
+        """Get api key."""
+        return deep_get(self.__user_data, ["user", "apikey"])
+
+    @property
+    def app_id(self) -> str | None:
+        """Get app id."""
+        return self.__app_id
+
+    @property
+    def access_token(self) -> str | None:
+        """Get at."""
+        return deep_get(self.__user_data, ["at"])
+
+    @property
+    def refresh_token(self) -> str | None:
+        """Get rt."""
+        return deep_get(self.__user_data, ["rt"])
+
+    @property
+    def api_timezone(self) -> dict | None:
+        """Get the time zone returned from the api."""
+        return deep_get(self.__user_data, ["user", "timezone"])
+
+    @property
+    def account(self) -> str | None:
+        """Get user account."""
+        return self.__account
