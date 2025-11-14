@@ -36,30 +36,28 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
         )
         self.api_client = api_client
         self.ws_client = ws_client
+        self._device_dict = {}
         self._device_callbacks: dict[str, list] = {}
 
     async def _async_update_data(self) -> dict[str, EWeLinkDevice]:
         """Fetch data from API."""
         try:
-            devices = await self.api_client.get_devices()
-
-            # Convert list to dict with device_id as key
-            device_dict: dict[str, EWeLinkDevice] = {
-                device.device_id: device for device in devices
-            }
-
-            return device_dict
-
+            self._device_dict = await self.api_client.get_all_devices()
         except EWeLinkApiError as err:
             raise UpdateFailed(f"Error communicating with eWeLink API: {err}") from err
+        else:
+            return self._device_dict
 
     async def async_setup(self) -> None:
         """Set up the coordinator."""
         # Do initial data fetch
         await self.async_config_entry_first_refresh()
-
+        _LOGGER.info(
+            "----------------------------------------------------------------------------------------->"
+        )
+        _LOGGER.info(self._device_dict)
         # Connect to WebSocket for real-time updates
-        await self.ws_client.connect()
+        # await self.ws_client.connect()
 
     async def async_shutdown(self) -> None:
         """Shutdown the coordinator."""

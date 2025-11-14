@@ -24,6 +24,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> b
     api_client = EWeLinkApiClient.get_instance()
     _LOGGER.info(api_client)
 
+    if api_client is None:
+        pass
+
     # Create WebSocket client
     ws_client = EWeLinkWebSocketClient(
         session=api_client.session,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from dataclasses import dataclass
 from enum import StrEnum
@@ -12,7 +13,6 @@ import logging
 from typing import Any
 
 import aiohttp
-import asyncio
 
 from homeassistant.const import CONF_PASSWORD
 
@@ -26,14 +26,17 @@ _LOGGER = logging.getLogger(__name__)
 class EWeLinkDevice:
     """Represent an eWeLink device."""
 
-    device_id: str
-    name: str
-    brand_name: str
-    product_model: str
-    device_type: str
-    online: bool
-    params: dict[str, Any]
-    tags: dict[str, Any]
+    device: dict
+
+    @property
+    def device_id(self) -> str:
+        """Get device id."""
+        return deep_get(self.device, ["itemData", "deviceid"])
+
+    @property
+    def online(self) -> bool:
+        """Get device online status."""
+        return deep_get(self.device, ["itemData", "online"], False)
 
 
 class RequestMethod(StrEnum):
@@ -95,7 +98,7 @@ class EWeLinkApiClient:
             self.__access_token = ""
             self.__user_data = {}
             self.__family_list = []
-            self.__device_dict = {}
+            self.__device_dict: dict[str, EWeLinkDevice] = {}
             self._initialized = True
             _LOGGER.info("EWeLinkApiClient init api_url: %s", self.__api_base_url)
 
@@ -112,11 +115,14 @@ class EWeLinkApiClient:
         return EWELINK_API_MAP[regions[0]] if len(regions) > 0 else None
 
     def __generate_auth(
-        self, request_method: RequestMethod, params: dict[str, Any]
+        self, request_method: RequestMethod, params: dict[str, Any] | None = None
     ) -> str:
         """Generate signature for API request."""
         if self.__access_token:
             return f"Bearer {self.__access_token}"
+
+        if params is None:
+            return ""
 
         message = ""
         if request_method == RequestMethod.GET:
@@ -132,23 +138,19 @@ class EWeLinkApiClient:
         return f"Sign {(base64.b64encode(sha256)).decode()}"
 
     def __get_headers(
-        self, request_method: RequestMethod, params: dict[str, Any]
+        self, request_method: RequestMethod, params: dict[str, Any] | None = None
     ) -> dict[str, str]:
         """Get headers for API request."""
-
-        auth = self.__generate_auth(request_method, params)
-        _LOGGER.info("Params is %s, auth is %s", json.dumps(params), auth)
-
         return {
             "X-CK-Appid": self.__app_id,
             "X-CK-Nonce": gen_random_str(8),
-            "Authorization": auth,
+            "Authorization": self.__generate_auth(request_method, params),
             "Content-Type": "application/json",
         }
 
     def __common_error_handler(self, response_json: dict):
-        error = response_json.get('error', 0)
-        msg = response_json.get('msg', 'Unknown error')
+        error = response_json.get("error", 0)
+        msg = response_json.get("msg", "Unknown error")
         error_msg = f"error: {error}; msg: ${msg}"
         if error == 0:
             return
@@ -168,7 +170,6 @@ class EWeLinkApiClient:
             params["phoneNumber"] = f"{self.__country_code}{self.__account}"
 
         headers = self.__get_headers(RequestMethod.POST, params)
-        _LOGGER.info("Header is %s", json.dumps(headers))
 
         try:
             async with self.__session.post(
@@ -203,13 +204,20 @@ class EWeLinkApiClient:
                 await self.login()
 
             async with self.__session.get(
-                url=f"{self.__api_base_url}/v2/family"
+                url=f"{self.__api_base_url}/v2/family",
+                headers=self.__get_headers(RequestMethod.GET),
+                timeout=aiohttp.ClientTimeout(10),
             ) as response:
                 data: dict = await response.json()
-                _LOGGER.info("Get family json %s", json.dumps(data))
                 self.__common_error_handler(data)
-                if data['error'] == 0:
-                    self.__family_list = list(filter(deep_get(data, ['data', 'familyList'], []), lambda item: item['familyType'] in [1, 2]))
+                if data["error"] == 0:
+                    family_list = deep_get(data, ["data", "familyList"], [])
+                    self.__family_list = [
+                        family
+                        for family in family_list
+                        if family.get("familyType") in [1, 2]
+                    ]
+                _LOGGER.info("Get familly list: %s", json.dumps(self.__family_list))
                 return data
         except aiohttp.ClientError as err:
             _LOGGER.error("Get famility aiohttp.ClientError happen %s", err)
@@ -225,34 +233,38 @@ class EWeLinkApiClient:
                 url=f"{self.__api_base_url}/v2/device/thing",
                 params={"familyid": family_id, "num": 0},
                 header=self.__get_headers(),
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 data = await response.json()
                 self.__common_error_handler(data)
-                if data.get('error') == 0:
-                    device_list = deep_get(data, ['data', 'thingList'], [])
+                if data.get("error") == 0:
+                    device_list = deep_get(data, ["data", "thingList"], [])
                     if len(device_list) > 0:
                         for device in device_list:
-                            device_id = deep_get(device, ['itemData', 'deviceid'])
-                            self.__device_dict[device_id] = device
+                            device_id = deep_get(device, ["itemData", "deviceid"])
+                            self.__device_dict[device_id] = EWeLinkDevice(device)
                 return data
         except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
 
-    async def get_all_devices(self) -> list[EWeLinkDevice]:
+    async def get_all_devices(self) -> dict[str, EWeLinkDevice]:
         """Get all devices from eWeLink account."""
-
         await self.get_family()
         if len(self.__family_list) == 0:
-            return []
+            _LOGGER.info("Get_all_devices: family len is 0")
+            return {}
 
         try:
-            tasks = [self.get_family_device(family_id=family['id']) for family in self.__family_list]
+            family_ids = [family.get("id") for family in self.__family_list]
+            _LOGGER.info("Get_all_devices: family_ids: %s", json.dumps(family_ids))
+            tasks = [self.get_family_device(family_id) for family_id in family_ids]
             await asyncio.gather(*tasks, return_exceptions=True)
         except aiohttp.ClientError as err:
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
         except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
+        else:
+            return self.device_dict
 
     async def set_device_status(
         self, device_id: str, params: dict[str, Any]
@@ -329,3 +341,8 @@ class EWeLinkApiClient:
     def account(self) -> str | None:
         """Get user account."""
         return self.__account
+
+    @property
+    def device_dict(self) -> dict[str, EWeLinkDevice]:
+        """Get device dict."""
+        return self.__device_dict
