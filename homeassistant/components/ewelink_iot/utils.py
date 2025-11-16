@@ -3,6 +3,7 @@
 import random
 import re
 import string
+import time
 
 from .const import RE_EMAIL_PATTREN
 
@@ -37,3 +38,8 @@ def deep_get(data: dict, path: list[str], default=None):
             return default
         current = current[key]
     return current
+
+
+def now_timestamp():
+    """Get current timestamp."""
+    return int(round(time.time() * 1000))

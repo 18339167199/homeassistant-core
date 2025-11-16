@@ -24,30 +24,30 @@ async def async_setup_entry(
 
     entities: list[EWeLinkSwitch] = []
 
-    for device_id, device in coordinator.data.items():
-        # Get switch count from device params
-        switches = device.params.get("switches", [])
+    # for device_id, device in coordinator.data.items():
+    #     # Get switch count from device params
+    #     switches = device.params.get("switches", [])
 
-        if switches:
-            # Multi-channel switch
-            for idx, switch_data in enumerate(switches):
-                entities.append(
-                    EWeLinkSwitch(
-                        coordinator=coordinator,
-                        device_id=device_id,
-                        channel=idx,
-                    )
-                )
-        else:
-            # Single switch
-            if "switch" in device.params:
-                entities.append(
-                    EWeLinkSwitch(
-                        coordinator=coordinator,
-                        device_id=device_id,
-                        channel=None,
-                    )
-                )
+    #     if switches:
+    #         # Multi-channel switch
+    #         for idx, switch_data in enumerate(switches):
+    #             entities.append(
+    #                 EWeLinkSwitch(
+    #                     coordinator=coordinator,
+    #                     device_id=device_id,
+    #                     channel=idx,
+    #                 )
+    #             )
+    #     else:
+    #         # Single switch
+    #         if "switch" in device.params:
+    #             entities.append(
+    #                 EWeLinkSwitch(
+    #                     coordinator=coordinator,
+    #                     device_id=device_id,
+    #                     channel=None,
+    #                 )
+    #             )
 
     async_add_entities(entities)
 

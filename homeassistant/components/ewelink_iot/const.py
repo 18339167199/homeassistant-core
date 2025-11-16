@@ -17,7 +17,9 @@ EWELINK_API_US: Final = "https://us-apia.coolkit.cc"
 EWELINK_API_EU: Final = "https://eu-apia.coolkit.cc"
 EWELINK_API_IR: Final = "https://ir-apia.coolkit.cc"
 EWELINK_API_TEST: Final = "https://test-apia.coolkit.cn"
-EWELINK_WS_API: Final = "wss://api.ewelink.cc:8080/api/ws"
+
+EWELINK_WS_RESOURCE_CN = "https://cn-dispa.coolkit.cn"
+
 APP_ID: Final = "oc3tvAdJPmaVOKrLv0rjCC0dzub4bbnD"
 APP_SECRET: Final = "V0LmoW0cd2cg38i1eIM0P5Z29GjES4PA"
 

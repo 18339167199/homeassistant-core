@@ -17,7 +17,7 @@ import aiohttp
 from homeassistant.const import CONF_PASSWORD
 
 from .const import DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
-from .utils import deep_get, gen_random_str, is_valid_email
+from .utils import deep_get, gen_random_str, is_valid_email, now_timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,6 +84,7 @@ class EWeLinkApiClient:
         country_code: str,
         app_id: str,
         app_secret: str,
+        user_data=None,
     ) -> None:
         """Initialize the API client."""
         if not self._initialized:
@@ -94,9 +95,10 @@ class EWeLinkApiClient:
             self.__country_code = country_code
             self.__app_id = app_id
             self.__app_secret = app_secret
+            self.__at_updated_ts = -1
             self.__api_base_url = self.__get_api_base_url()
             self.__access_token = ""
-            self.__user_data = {}
+            self.__user_data = user_data if user_data is not None else ({})
             self.__family_list = []
             self.__device_dict: dict[str, EWeLinkDevice] = {}
             self._initialized = True
@@ -154,12 +156,15 @@ class EWeLinkApiClient:
         error_msg = f"error: {error}; msg: ${msg}"
         if error == 0:
             return
-        if error in (401, 403, 10001, 10014):
+        if error in (401, 403):
             self.login()
             raise EWeLinkAuthError(f"Authentication failed, ${error_msg}")
-        if error == 10003:
-            raise EWeLinkAccountNotExist(f"User account not exist, {error_msg}")
         raise EWeLinkApiError(error_msg)
+
+    def set_at_updated_ts(self, ts: int):
+        """Set at_updated_ts."""
+        self.__at_updated_ts = ts
+        return ts
 
     async def login(self) -> dict[str, Any]:
         """Login to eWeLink and get access token."""
@@ -180,6 +185,17 @@ class EWeLinkApiClient:
             ) as response:
                 data = await response.json()
                 _LOGGER.info("Logion response json: %s", json.dumps(data))
+                error = data.get("error")
+                if error != 0:
+                    error_msg = data.get("msg")
+                    if error == 500:
+                        raise EWeLinkApiError("No internet connect")
+                    if error == 1003:
+                        raise EWeLinkAccountNotExist(
+                            f"User account not exist, {error_msg}"
+                        )
+                    if error in [10001, 10014]:
+                        raise EWeLinkApiError(f"Account or password error, {error_msg}")
                 self.__common_error_handler(data)
                 # Extract authentication data
                 user_data = data.get("data", {}).get("user", {})
@@ -188,6 +204,7 @@ class EWeLinkApiClient:
 
                 _LOGGER.info("Successfully logged in to eWeLink")
                 self.__user_data = data.get("data", {})
+                self.set_at_updated_ts(now_timestamp)
                 return self.__user_data
 
         except aiohttp.ClientError as err:
@@ -231,8 +248,8 @@ class EWeLinkApiClient:
         try:
             async with self.__session.get(
                 url=f"{self.__api_base_url}/v2/device/thing",
-                params={"familyid": family_id, "num": 0},
-                header=self.__get_headers(),
+                params={"familyid": family_id, "num": 0, "beginIndex": -999999},
+                headers=self.__get_headers(RequestMethod.GET),
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 data = await response.json()
@@ -323,6 +340,11 @@ class EWeLinkApiClient:
         return self.__app_id
 
     @property
+    def at_updated_ts(self) -> int:
+        """Get at_updated_at."""
+        return self.__at_updated_ts
+
+    @property
     def access_token(self) -> str | None:
         """Get at."""
         return deep_get(self.__user_data, ["at"])
@@ -346,3 +368,8 @@ class EWeLinkApiClient:
     def device_dict(self) -> dict[str, EWeLinkDevice]:
         """Get device dict."""
         return self.__device_dict
+
+    @property
+    def country_code(self) -> str:
+        """Get country code."""
+        return self.__country_code

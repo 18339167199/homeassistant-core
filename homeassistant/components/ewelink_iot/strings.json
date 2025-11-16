@@ -7,14 +7,12 @@
         "data": {
           "account": "Account",
           "password": "Password",
-          "region": "Region",
-          "app_id": "App ID (optional)",
-          "app_secret": "App Secret (optional)"
+          "region": "Region"
         }
       },
       "reauth_confirm": {
         "title": "Reauthenticate with eWeLink",
-        "description": "The credentials for {email} need to be updated",
+        "description": "The credentials for {account} need to be updated",
         "data": {
           "password": "Password"
         }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+import json
 import logging
 from typing import Any
 
@@ -28,7 +30,7 @@ from .const import (
     REGION_DEFAULT,
     REGIONS_MAP,
 )
-from .utils import gen_config_flow_id
+from .utils import gen_config_flow_id, now_timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +77,11 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Create config entry
                 return self.async_create_entry(
                     title=user_input[CONF_ACCOUNT],
-                    data={"user_input": user_input, "user_data": user_data},
+                    data={
+                        "user_input": user_input,
+                        "user_data": user_data,
+                        "at_updated_ts": now_timestamp(),
+                    },
                 )
 
             except EWeLinkAccountNotExist:
@@ -123,15 +129,18 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                # Test new credentials
                 session = async_get_clientsession(self.hass)
-
-                # create api client
+                account = reauth_entry.data.get("user_input", {}).get(CONF_ACCOUNT)
+                country_code = reauth_entry.data.get("user_input", {}).get(
+                    CONF_REGION, REGION_DEFAULT
+                )
                 api_client = EWeLinkApiClient(
                     session=session,
-                    email=reauth_entry.data[CONF_ACCOUNT],
+                    account=account,
                     password=user_input[CONF_PASSWORD],
-                    region=reauth_entry.data.get(CONF_REGION, REGION_DEFAULT),
+                    country_code=country_code,
+                    app_id=APP_ID,
+                    app_secret=APP_SECRET,
                 )
 
                 # login with user account
@@ -155,5 +164,7 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             errors=errors,
-            description_placeholders={"email": reauth_entry.data[CONF_ACCOUNT]},
+            description_placeholders={
+                "account": reauth_entry.data.get("user_input", {}).get(CONF_ACCOUNT)
+            },
         )
