@@ -12,6 +12,12 @@ from . import EWeLinkConfigEntry
 from .api import EWeLinkApiError
 from .coordinator import EWeLinkDataCoordinator
 from .entity import EWeLinkEntity
+from .uiid.switch import (
+    SWITCH_UIIDS,
+    SINGLE_PROTOCOL_UIIDS,
+    MULTIPLE_SINGLE_PROTOCOL_UIIDS,
+    SwitchCoordinator,
+)
 
 
 async def async_setup_entry(
@@ -24,30 +30,19 @@ async def async_setup_entry(
 
     entities: list[EWeLinkSwitch] = []
 
-    # for device_id, device in coordinator.data.items():
-    #     # Get switch count from device params
-    #     switches = device.params.get("switches", [])
+    switch_and_toggle_device_dict = {
+        device_id: device
+        for device_id, device in coordinator.data.items()
+        if device.uiid in SWITCH_UIIDS
+    }
 
-    #     if switches:
-    #         # Multi-channel switch
-    #         for idx, switch_data in enumerate(switches):
-    #             entities.append(
-    #                 EWeLinkSwitch(
-    #                     coordinator=coordinator,
-    #                     device_id=device_id,
-    #                     channel=idx,
-    #                 )
-    #             )
-    #     else:
-    #         # Single switch
-    #         if "switch" in device.params:
-    #             entities.append(
-    #                 EWeLinkSwitch(
-    #                     coordinator=coordinator,
-    #                     device_id=device_id,
-    #                     channel=None,
-    #                 )
-    #             )
+    for device_id, device in switch_and_toggle_device_dict:
+        uiid = device.uiid
+        if uiid in [*MULTIPLE_SINGLE_PROTOCOL_UIIDS, *SINGLE_PROTOCOL_UIIDS]:
+            entities.append(
+                coordinator=coordinator,
+                device_id=device_id,
+            )
 
     async_add_entities(entities)
 
@@ -61,22 +56,12 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         self,
         coordinator: EWeLinkDataCoordinator,
         device_id: str,
-        channel: int | None,
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, device_id)
 
-        self._channel = channel
-
-        # Set unique ID
-        if channel is not None:
-            self._attr_unique_id = f"{device_id}_switch_{channel}"
-            self._attr_name = f"Channel {channel + 1}"
-            self._attr_translation_key = "switch_channel"
-            self._attr_translation_placeholders = {"channel": str(channel + 1)}
-        else:
-            self._attr_unique_id = f"{device_id}_switch"
-            self._attr_name = None  # Use device name
+        self._attr_unique_id = f"{device_id}_switch"
+        self._attr_name = None  # Use device name
 
     @property
     def is_on(self) -> bool:

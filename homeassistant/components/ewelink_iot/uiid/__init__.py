@@ -1,0 +1,1 @@
+"""EWeLink device uiid."""

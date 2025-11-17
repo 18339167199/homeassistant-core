@@ -28,18 +28,26 @@ def gen_config_flow_id(account: str) -> str:
     return f"ewelink_lot_{account}"
 
 
-def deep_get(data: dict, path: list[str], default=None):
-    """Deep get a dict property."""
-    current = data
+def deep_get(obj: object, path: list[str | int], default=None):
+    """Deeply get a value from nested structures (dict, list, tuple, object)."""
+    current = obj
     for key in path:
-        if not isinstance(current, dict):
+        try:
+            if isinstance(current, (dict, list, tuple)):
+                current = current[key]
+            else:
+                # Try attribute access for objects
+                current = getattr(current, key)
+        except (KeyError, IndexError, AttributeError, TypeError):
             return default
-        if key not in current:
-            return default
-        current = current[key]
     return current
 
 
 def now_timestamp():
     """Get current timestamp."""
     return int(round(time.time() * 1000))
+
+
+def get_device_uiid(device: dict) -> int:
+    """Get device uiid."""
+    return deep_get(device, ["itemData", "extra", "uiid"])

@@ -5,6 +5,8 @@ from typing import Final
 
 from homeassistant.const import Platform
 
+from .uiid.uiid_191 import UIID_191
+
 # Dev mode
 DEV_MODE = os.getenv("HA_DEV_MODE") == "1"
 
@@ -271,3 +273,7 @@ EWELINK_API_MAP: Final = {
     REGION_IR: EWELINK_API_IR,
     REGION_TEST: EWELINK_API_TEST,
 }
+
+SUPPORT_UIID = [UIID_191]
+
+SWITCH_AND_TOGGLE_UIID = [UIID_191]

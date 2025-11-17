@@ -29,6 +29,26 @@ class EWeLinkDevice:
     device: dict
 
     @property
+    def device_name(self) -> str:
+        """Get device name."""
+        return deep_get(self.device, ["itemData", "name"], "eWeLink device")
+
+    @property
+    def model(self) -> str:
+        "Get device model."
+        return deep_get(self.device, ["itemData", "params", "model"], None)
+
+    @property
+    def brand_name(self) -> str:
+        "Get device brand name."
+        return deep_get(self.device, ["itemData", "brandName"], "eWeLink")
+
+    @property
+    def uiid(self) -> str:
+        "Get device uiid."
+        return deep_get(self.device, ["itemData", "extra", "uiid"], None)
+
+    @property
     def device_id(self) -> str:
         """Get device id."""
         return deep_get(self.device, ["itemData", "deviceid"])
