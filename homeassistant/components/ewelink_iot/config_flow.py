@@ -74,6 +74,8 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 # If the unique ID has been configured, the current config flow is discarded to prevent configuration reset.
                 self._abort_if_unique_id_configured()
 
+                api_client = None
+
                 # Create config entry
                 return self.async_create_entry(
                     title=user_input[CONF_ACCOUNT],

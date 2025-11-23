@@ -5,8 +5,6 @@ from typing import Final
 
 from homeassistant.const import Platform
 
-from .uiid.uiid_191 import UIID_191
-
 # Dev mode
 DEV_MODE = os.getenv("HA_DEV_MODE") == "1"
 
@@ -22,8 +20,15 @@ EWELINK_API_TEST: Final = "https://test-apia.coolkit.cn"
 
 EWELINK_WS_RESOURCE_CN = "https://cn-dispa.coolkit.cn"
 
+# 15 days
+EWELINK_API_AT_EXPIRED_TS = 15 * 24 * 60 * 60 * 1000
+
 APP_ID: Final = "oc3tvAdJPmaVOKrLv0rjCC0dzub4bbnD"
 APP_SECRET: Final = "V0LmoW0cd2cg38i1eIM0P5Z29GjES4PA"
+
+WS_CLIENT = "ws_client"
+API_CLIENT = "api_client"
+COORDINATOR = "coordinator"
 
 # Config entry keys
 CONF_ACCOUNT: Final = "account"
@@ -273,7 +278,3 @@ EWELINK_API_MAP: Final = {
     REGION_IR: EWELINK_API_IR,
     REGION_TEST: EWELINK_API_TEST,
 }
-
-SUPPORT_UIID = [UIID_191]
-
-SWITCH_AND_TOGGLE_UIID = [UIID_191]

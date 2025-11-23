@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,9 +12,20 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import EWeLinkApiClient
-from .const import APP_ID, APP_SECRET, CONF_ACCOUNT, REGION_DEFAULT
+from .const import (
+    APP_ID,
+    APP_SECRET,
+    CONF_ACCOUNT,
+    DOMAIN,
+    REGION_DEFAULT,
+    EWELINK_API_AT_EXPIRED_TS,
+    WS_CLIENT,
+    API_CLIENT,
+    COORDINATOR,
+)
 from .coordinator import EWeLinkDataCoordinator
 from .websocket import EWeLinkWebSocketClient
+from .utils import now_timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,51 +36,64 @@ type EWeLinkConfigEntry = ConfigEntry[EWeLinkDataCoordinator]
 
 async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> bool:
     """Set up eWeLink IoT from a config entry."""
-    if EWeLinkApiClient.get_instance() is None:
-        account = entry.data.get("user_input", {}).get(CONF_ACCOUNT)
-        password = entry.data.get("user_input", {}).get(CONF_PASSWORD)
-        country_code = entry.data.get("user_input", {}).get(
-            "CONF_REGION", REGION_DEFAULT
-        )
-        user_data = entry.data.get("user_data", None)
+    account = entry.data.get("user_input", {}).get(CONF_ACCOUNT)
+    password = entry.data.get("user_input", {}).get(CONF_PASSWORD)
+    country_code = entry.data.get("user_input", {}).get("CONF_REGION", REGION_DEFAULT)
+    user_data = entry.data.get("user_data", None)
+    at_updated_ts = entry.data.get("at_updated_ts")
+    now_ts = now_timestamp()
+    is_at_expired = (
+        at_updated_ts + EWELINK_API_AT_EXPIRED_TS < now_ts
+        if isinstance(at_updated_ts, int)
+        else False
+    )
 
-        if (not account) or (not password) or (not country_code):
-            raise ConfigEntryAuthFailed("Missing credentials, please reconfigure")
+    if (not account) or (not password) or (not country_code) or is_at_expired:
+        raise ConfigEntryAuthFailed("Missing credentials, please reconfigure")
 
-        EWeLinkApiClient(
-            session=async_get_clientsession(hass),
-            account=account,
-            password=password,
-            country_code=country_code,
-            app_id=APP_ID,
-            app_secret=APP_SECRET,
-            user_data=user_data,
-        )
-
-    api_client = EWeLinkApiClient.get_instance()
+    # Create api client
+    api_client = EWeLinkApiClient(
+        session=async_get_clientsession(hass),
+        account=account,
+        password=password,
+        country_code=country_code,
+        app_id=APP_ID,
+        app_secret=APP_SECRET,
+        user_data=user_data,
+    )
 
     # Create WebSocket client
     ws_client = EWeLinkWebSocketClient(
+        hass=hass,
         session=api_client.session,
         api_key=api_client.api_key,
         app_id=APP_ID,
         access_token=api_client.access_token,
         country_code=api_client.country_code,
     )
+    await ws_client.start()
+    entry.async_on_unload(ws_client.stop)
 
-    # # Create coordinator
+    # Create coordinator
     coordinator = EWeLinkDataCoordinator(
-        hass=hass, api_client=api_client, ws_client=ws_client, config_entry=entry
+        hass=hass, api_client=api_client, config_entry=entry
     )
 
-    # # Store coordinator in runtime data
-    entry.runtime_data = coordinator
+    runtime_data = {
+        WS_CLIENT: ws_client,
+        API_CLIENT: api_client,
+        COORDINATOR: coordinator,
+    }
 
-    # # Setup coordinator
+    # Setup coordinator
     await coordinator.async_setup()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = runtime_data
 
     # Setup platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    _LOGGER.info("EWeLink lot integration load over ===================>")
 
     return True
 
@@ -80,19 +105,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        coordinator = entry.runtime_data
-
+        runtime_data = hass.data[DOMAIN].pop(entry.entry_id)
         # Shutdown coordinator (stops polling and cleans up)
-        await coordinator.async_shutdown()
-
-        # Close WebSocket connection
-        if coordinator.ws_client:
-            await coordinator.ws_client.disconnect()
-
-        # Close API client session (if not shared)
-        api_client = EWeLinkApiClient.get_instance()
-        if api_client and hasattr(api_client, "close"):
-            await api_client.close()
+        if COORDINATOR in runtime_data:
+            await runtime_data[COORDINATOR].async_shutdown()
+        if WS_CLIENT in runtime_data:
+            await runtime_data[WS_CLIENT].stop()
 
         _LOGGER.debug("Successfully unloaded eWeLink IoT integration")
 

@@ -16,7 +16,7 @@ import aiohttp
 
 from homeassistant.const import CONF_PASSWORD
 
-from .const import DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
+from .const import CONF_COUNTRY_CODE, DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
 from .utils import deep_get, gen_random_str, is_valid_email, now_timestamp
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +58,11 @@ class EWeLinkDevice:
         """Get device online status."""
         return deep_get(self.device, ["itemData", "online"], False)
 
+    @property
+    def manufacturer(self) -> str:
+        """Get device manufacturer."""
+        return deep_get(self.device, ["itemData", "extra", "manufacturer"], "ewelink")
+
 
 class RequestMethod(StrEnum):
     """Request method of http."""
@@ -87,15 +92,6 @@ class EWeLinkConnectionError(EWeLinkApiError):
 class EWeLinkApiClient:
     """eWeLink IoT API client."""
 
-    _instance: EWeLinkApiClient | None = None
-    _initialized = False
-
-    def __new__(cls, *args, **kwargs):
-        """Singleton for api client."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(
         self,
         session: aiohttp.ClientSession,
@@ -107,22 +103,24 @@ class EWeLinkApiClient:
         user_data=None,
     ) -> None:
         """Initialize the API client."""
-        if not self._initialized:
-            self.__session = session
-            self.__account = account
-            self.__password = password
-            self.__app_id = app_id
-            self.__country_code = country_code
-            self.__app_id = app_id
-            self.__app_secret = app_secret
-            self.__at_updated_ts = -1
-            self.__api_base_url = self.__get_api_base_url()
-            self.__access_token = ""
-            self.__user_data = user_data if user_data is not None else ({})
-            self.__family_list = []
-            self.__device_dict: dict[str, EWeLinkDevice] = {}
-            self._initialized = True
-            _LOGGER.info("EWeLinkApiClient init api_url: %s", self.__api_base_url)
+        self.__session = session
+        self.__account = account
+        self.__password = password
+        self.__app_id = app_id
+        self.__country_code = country_code
+        self.__app_id = app_id
+        self.__app_secret = app_secret
+        self.__at_updated_ts = -1
+        self.__api_base_url = self.__get_api_base_url()
+        self.__access_token = ""
+        self.__family_list = []
+        self.__device_dict: dict[str, EWeLinkDevice] = {}
+        if user_data is not None:
+            self.__user_data = user_data
+            self.__access_token = deep_get(user_data, ["at"])
+        else:
+            self.__user_data = {}
+        _LOGGER.info("EWeLinkApiClient init api_url: %s", self.__api_base_url)
 
     def __get_api_base_url(self):
         """Get eWeLink api base url."""
@@ -132,7 +130,7 @@ class EWeLinkApiClient:
         regions = [
             item["region"]
             for item in REGIONS_MAP
-            if item["countryCode"] == self.__country_code
+            if item[CONF_COUNTRY_CODE] == self.__country_code
         ]
         return EWELINK_API_MAP[regions[0]] if len(regions) > 0 else None
 
@@ -177,7 +175,6 @@ class EWeLinkApiClient:
         if error == 0:
             return
         if error in (401, 403):
-            self.login()
             raise EWeLinkAuthError(f"Authentication failed, ${error_msg}")
         raise EWeLinkApiError(error_msg)
 
@@ -204,7 +201,6 @@ class EWeLinkApiClient:
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 data = await response.json()
-                _LOGGER.info("Logion response json: %s", json.dumps(data))
                 error = data.get("error")
                 if error != 0:
                     error_msg = data.get("msg")
@@ -237,9 +233,6 @@ class EWeLinkApiClient:
     async def get_family(self):
         """Get user family data."""
         try:
-            if not self.__access_token:
-                await self.login()
-
             async with self.__session.get(
                 url=f"{self.__api_base_url}/v2/family",
                 headers=self.__get_headers(RequestMethod.GET),
@@ -257,11 +250,11 @@ class EWeLinkApiClient:
                 _LOGGER.info("Get familly list: %s", json.dumps(self.__family_list))
                 return data
         except aiohttp.ClientError as err:
-            _LOGGER.error("Get famility aiohttp.ClientError happen %s", err)
+            _LOGGER.error("Get family aiohttp.ClientError happen: %s", err)
         except TimeoutError as err:
-            _LOGGER.error("Get famility timeout %s", err)
+            _LOGGER.error("Get family timeout: %s", err)
         except EWeLinkApiError as err:
-            _LOGGER.error(err)
+            _LOGGER.error("Get family error happen: %s", err)
 
     async def get_family_device(self, family_id: str):
         """Get all device by family id."""
@@ -307,9 +300,6 @@ class EWeLinkApiClient:
         self, device_id: str, params: dict[str, Any]
     ) -> dict[str, Any]:
         """Set device status."""
-        if not self.__access_token:
-            await self.login()
-
         url = f"{self.__api_base_url}/device/thing/status"
         headers = self.__get_headers()
 
@@ -338,11 +328,6 @@ class EWeLinkApiClient:
             raise EWeLinkConnectionError(f"Connection error: {err}") from err
         except TimeoutError as err:
             raise EWeLinkConnectionError("Request timeout") from err
-
-    @classmethod
-    def get_instance(cls):
-        """Get api client instance."""
-        return cls._instance
 
     @property
     def session(self):
@@ -393,3 +378,15 @@ class EWeLinkApiClient:
     def country_code(self) -> str:
         """Get country code."""
         return self.__country_code
+
+    @property
+    def logged(self) -> bool:
+        """Get is logged."""
+        now_ts = now_timestamp()
+        has_at = isinstance(self.access_token, str) and len(self.access_token) > 0
+        is_at_expired = (
+            self.at_updated_ts + (15 * 24 * 60 * 60 * 1000) < now_ts
+            if isinstance(self.at_updated_ts, int)
+            else False
+        )
+        return has_at and (not is_at_expired)
