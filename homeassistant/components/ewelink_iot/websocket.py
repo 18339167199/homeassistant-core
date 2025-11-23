@@ -133,7 +133,7 @@ class EWeLinkWebSocketClient:
 
     async def start(self):
         """Start websocket connect task."""
-        self.__hass_task = self.__hass.async_create_task(
+        self.__hass_task = self.__hass.async_create_background_task(
             self.connect_and_reconnect(), name="ewelink_lot_ws_client"
         )
         return True
@@ -153,7 +153,7 @@ class EWeLinkWebSocketClient:
             await self.__session.close()
             self.__session = None
 
-        _LOGGER("[EWeLink websocket] client stopped and resources cleaned up.")
+        _LOGGER.info("[EWeLink websocket] client stopped and resources cleaned up.")
 
         return True
 
