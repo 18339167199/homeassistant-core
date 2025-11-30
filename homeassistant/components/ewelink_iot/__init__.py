@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,28 +12,26 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import EWeLinkApiClient
 from .const import (
+    API_CLIENT,
     APP_ID,
     APP_SECRET,
     CONF_ACCOUNT,
-    DOMAIN,
-    REGION_DEFAULT,
-    EWELINK_API_AT_EXPIRED_TS,
-    WS_CLIENT,
-    API_CLIENT,
     COORDINATOR,
+    DOMAIN,
+    EWELINK_API_AT_EXPIRED_TS,
+    REGION_DEFAULT,
+    WS_CLIENT,
 )
 from .coordinator import EWeLinkDataCoordinator
-from .websocket import EWeLinkWebSocketClient
 from .utils import now_timestamp
+from .websocket import EWeLinkWebSocketClient
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SWITCH]
 
-type EWeLinkConfigEntry = ConfigEntry[EWeLinkDataCoordinator]
 
-
-async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up eWeLink IoT from a config entry."""
     account = entry.data.get("user_input", {}).get(CONF_ACCOUNT)
     password = entry.data.get("user_input", {}).get(CONF_PASSWORD)
@@ -76,7 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> b
 
     # Create coordinator
     coordinator = EWeLinkDataCoordinator(
-        hass=hass, api_client=api_client, config_entry=entry
+        hass=hass, api_client=api_client, config_entry=entry, ws_client=ws_client
     )
 
     runtime_data = {
@@ -98,7 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> b
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: EWeLinkConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
 
     # Unload platforms (entities)

@@ -2,32 +2,29 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import EWeLinkConfigEntry
-from .api import EWeLinkApiError, EWeLinkDevice
+from .const import COORDINATOR, DOMAIN
 from .coordinator import EWeLinkDataCoordinator
 from .entity import EWeLinkEntity
-from .const import DOMAIN, COORDINATOR
-from .uiid.switch import (
-    MULTIPLE_SINGLE_PROTOCOL_UIIDS,
-    SwitchCoordinator,
-    SINGLE_PROTOCOL_UIIDS,
-    SWITCH_UIIDS,
-    OFF,
-    ON,
-)
+from .uiid import SWITCH_UIIDS, get_device_coordinator
+from .utils import get_device_uiid
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: EWeLinkConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up eWeLink switches from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
@@ -40,13 +37,13 @@ async def async_setup_entry(
 
     for device_id, device in switch_and_toggle_device_dict.items():
         uiid = device.uiid
-        if uiid in [*MULTIPLE_SINGLE_PROTOCOL_UIIDS, *SINGLE_PROTOCOL_UIIDS]:
-            ewelink_switch = EWeLinkSwitch(
-                coordinator=coordinator, device_id=device_id, device=device
+        if uiid in SWITCH_UIIDS:
+            ewelink_switch_entity = EWeLinkSwitch(
+                coordinator=coordinator, device_id=device_id
             )
-            entities.append(ewelink_switch)
+            entities.append(ewelink_switch_entity)
 
-    async_add_entities(entities)
+    async_add_entities(entities, update_before_add=True)
 
 
 class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
@@ -54,29 +51,36 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(
-        self, coordinator: EWeLinkDataCoordinator, device_id: str, device: EWeLinkDevice
-    ) -> None:
+    def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, device_id)
 
-        self._device = device
+        self.device_id = device_id
+
+        uiid = get_device_uiid(self.ewelink_device.device)
+        self.device_coordinator = get_device_coordinator(uiid)
+
         self._device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
-            name=device.device_name,
-            manufacturer=device.manufacturer,
-            model=device.model,
+            name=self.ewelink_device.device_name,
+            manufacturer=self.ewelink_device.manufacturer,
+            model=self.ewelink_device.model,
             serial_number=device_id,
         )
         self._attr_unique_id = f"ewelink_{device_id}_switch"
         self._attr_name = None  # Use device name
 
     @property
+    def ewelink_device(self):
+        """Get EWeLinkDevice instance."""
+        return self.coordinator.data.get(self.device_id)
+
+    @property
     def is_on(self) -> bool:
         """Return true if switch is on."""
-        if not self._device:
+        if not self.ewelink_device or not self.device_coordinator:
             return False
-        return SwitchCoordinator.get_switch_state(self._device) == ON
+        return self.device_coordinator.get_switch_state(self.ewelink_device.device)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
@@ -86,23 +90,17 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         """Turn the switch off."""
         await self._async_set_switch_state(False)
 
-    async def _async_set_switch_state(self, state: bool) -> None:
+    async def _async_set_switch_state(self, is_on: bool) -> None:
         """Set switch state."""
-        if not self._device:
+        if not self.ewelink_device:
             return
-
-        try:
-            self.async_write_ha_state()
-
-        except EWeLinkApiError as err:
-            self._attr_available = False
-            self.async_write_ha_state()
-            raise
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
+        params = self.device_coordinator.gen_control_switch_params(is_on)
+        _LOGGER.info(
+            "[switch platform] control device_id: %s; params: %s",
+            self.ewelink_device.device_id,
+            json.dumps(params),
+        )
+        await self.coordinator.control_device(self.ewelink_device, params)
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""

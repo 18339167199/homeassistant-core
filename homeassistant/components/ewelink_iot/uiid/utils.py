@@ -1,17 +1,8 @@
 """Common utils."""
 
 import random
-import re
 import string
 import time
-from typing import Any
-
-from .const import RE_EMAIL_PATTREN
-
-
-def is_valid_email(input: str) -> bool:
-    """Valid input is email format."""
-    return bool(re.fullmatch(RE_EMAIL_PATTREN, input))
 
 
 def gen_random_str(len=8, charsets: None | list = None) -> str:
@@ -51,18 +42,4 @@ def now_timestamp():
 
 def get_device_uiid(device: dict) -> int:
     """Get device uiid."""
-    return deep_get(device, ["itemData", "extra", "uiid"], None)
-
-
-def merge(origin_dict: dict[Any, Any], source_dict: dict[Any, Any]) -> dict[Any, Any]:
-    """Merge source dict to origin dict."""
-    for key, value in source_dict.items():
-        if key in origin_dict:
-            if isinstance(origin_dict[key], dict) and isinstance(value, dict):
-                merge(origin_dict[key], value)
-            else:
-                origin_dict[key] = value
-        else:
-            origin_dict[key] = value
-
-    return origin_dict
+    return deep_get(device, ["itemData", "extra", "uiid"])

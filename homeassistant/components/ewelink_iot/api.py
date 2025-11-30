@@ -63,6 +63,11 @@ class EWeLinkDevice:
         """Get device manufacturer."""
         return deep_get(self.device, ["itemData", "extra", "manufacturer"], "ewelink")
 
+    @property
+    def apikey(self) -> str:
+        """Get device apikey."""
+        return deep_get(self.device, ["itemData", "apikey"])
+
 
 class RequestMethod(StrEnum):
     """Request method of http."""

@@ -1,42 +1,43 @@
 """Common switch data coordinator."""
 
-from ...utils import deep_get, get_device_uiid
-from .uiid_191 import UIID_191
+from ..utils import deep_get, get_device_uiid
 
-ON = "on"
 OFF = "off"
+ON = "on"
+SINGLE_PROTOCOL_UIIDS = [1]
+MULTIPLE_SINGLE_PROTOCOL_UIIDS = [191]
+SWITCH_UIIDS = [
+    *SINGLE_PROTOCOL_UIIDS,
+    *MULTIPLE_SINGLE_PROTOCOL_UIIDS,
+]
 
 
 class SwitchCoordinator:
     """EWeLink Switch Coordinator."""
 
-    @staticmethod
-    def get_switch_state(device: dict) -> str:
-        """Get ewelink switch device switch state."""
+    def __init__(self, uiid) -> None:
+        """Init."""
+        self.uiid = uiid
 
+    def get_switch_state(self, device: dict):
+        """Get ewelink switch device switch state."""
         uiid = get_device_uiid(device)
         if uiid in SINGLE_PROTOCOL_UIIDS:
-            return deep_get(device, ["itemData", "params", "switch"], OFF)
+            return deep_get(device, ["itemData", "params", "switch"], OFF) == ON
         if uiid in MULTIPLE_SINGLE_PROTOCOL_UIIDS:
-            return deep_get(
-                device, ["itemData", "params", "switches", 0, "switch"], OFF
+            return (
+                deep_get(device, ["itemData", "params", "switches", 0, "switch"], OFF)
+                == ON
             )
-        return None
+        return False
 
-    def single_protocol_ewelink_state_2_ha():
-        """Transform eWeLink device state to ha entity state."""
-        return True
-
-    def single_protocol_ha_state_2_ewelink():
-        """Transfrom ha entity state to ewelink device state."""
-        return True
-
-
-SINGLE_PROTOCOL_UIIDS = []
-
-MULTIPLE_SINGLE_PROTOCOL_UIIDS = [UIID_191]
-
-SWITCH_UIIDS = [
-    *SINGLE_PROTOCOL_UIIDS,
-    *MULTIPLE_SINGLE_PROTOCOL_UIIDS,
-]
+    def gen_control_switch_params(self, is_on: bool):
+        "Gen control switch params."
+        target = ON if is_on else OFF
+        if self.uiid in MULTIPLE_SINGLE_PROTOCOL_UIIDS:
+            return {
+                "switches": [
+                    {"switch": target if i == 0 else OFF, "outlet": i} for i in range(4)
+                ]
+            }
+        return {"switch": target}
