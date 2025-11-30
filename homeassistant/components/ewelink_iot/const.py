@@ -42,10 +42,17 @@ DEVICE_TYPE_SWITCH: Final = "switch"
 
 # Websocket message types
 WS_MSG_TYPE_HANDSHAKE: Final = "handshake"
-WS_MSG_TYPE_UPDATE: Final = "update"
+WS_MSG_ACTION: Final = "action"
+WS_MSG_ACTION_UPDATE: Final = "update"
+WS_MSG_ACTION_USER_ONLINE: Final = "userOnline"
+WS_USER_AGENT: Final = "pc_ewelink"
 
 # re pattren
 RE_EMAIL_PATTREN = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+
+# top domain
+CN: Final = "cn"
+CC: Final = "cc"
 
 # Regions
 REGION_CN: Final = "cn"

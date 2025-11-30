@@ -66,6 +66,9 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
 
     async def control_device(self, ewelink_device: EWeLinkDevice, params: dict):
         """Control EWeLink device."""
-        await self.ws_client.control_device(
+        result = await self.ws_client.control_device(
             ewelink_device=ewelink_device, params=params
         )
+        if result is not None and result.get("error") == 0:
+            self.update_entity_state(ewelink_device.device_id, params)
+        return result

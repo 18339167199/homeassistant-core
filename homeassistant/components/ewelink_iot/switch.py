@@ -18,8 +18,6 @@ from .entity import EWeLinkEntity
 from .uiid import SWITCH_UIIDS, get_device_coordinator
 from .utils import get_device_uiid
 
-_LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -67,7 +65,7 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
             model=self.ewelink_device.model,
             serial_number=device_id,
         )
-        self._attr_unique_id = f"ewelink_{device_id}_switch"
+        self._attr_unique_id = f"ewelink_lot_{device_id}_switch"
         self._attr_name = None  # Use device name
 
     @property
@@ -95,12 +93,9 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         if not self.ewelink_device:
             return
         params = self.device_coordinator.gen_control_switch_params(is_on)
-        _LOGGER.info(
-            "[switch platform] control device_id: %s; params: %s",
-            self.ewelink_device.device_id,
-            json.dumps(params),
-        )
-        await self.coordinator.control_device(self.ewelink_device, params)
+        result = await self.coordinator.control_device(self.ewelink_device, params)
+        if result is not None and result.get("error") == 0:
+            self._async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""

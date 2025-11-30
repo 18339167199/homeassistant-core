@@ -12,7 +12,19 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 
 from .api import EWeLinkApiError, EWeLinkDevice
-from .const import EWELINK_WS_RESOURCE_CN
+from .const import (
+    CC,
+    CN,
+    CONF_COUNTRY_CODE,
+    CONF_REGION,
+    EWELINK_WS_RESOURCE_CN,
+    REGION_CN,
+    REGIONS_MAP,
+    WS_MSG_ACTION,
+    WS_MSG_ACTION_UPDATE,
+    WS_MSG_ACTION_USER_ONLINE,
+    WS_USER_AGENT,
+)
 from .utils import gen_random_str, now_timestamp
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,18 +55,46 @@ class EWeLinkWebSocketClient:
         self.__reconnect_delay_time = 5
         self.__hass_task = None  # asyncio.Task
         self.__stop_event = asyncio.Event()
-
         self.__coordinator_handler = {}
+        self.__pending_responses: dict[str, asyncio.Future] = {}
 
     def __get_ws_base_url(self):
         """Get ws base url."""
+        match_region = [
+            x[CONF_REGION]
+            for x in REGIONS_MAP
+            if x[CONF_COUNTRY_CODE] == self.__country_code
+        ]
+        if len(match_region) > 0:
+            region = match_region[0]
+            top_domain = CN if region == REGION_CN else CC
+            return f"https://{region}-dispa.coolkit.{top_domain}"
         return EWELINK_WS_RESOURCE_CN
+
+    async def __get_ws_address(self):
+        """Get ws connect address."""
+        server_url = f"{self.__ws_base_url}/dispatch/app"
+        async with self.__session.get(
+            url=server_url, timeout=aiohttp.ClientTimeout(total=10)
+        ) as response:
+            data = await response.json()
+            error = data.get("error")
+            if error != 0:
+                raise EWeLinkApiError("Can not get ws connect address")
+            return f"wss://{data.get('domain')}/api/ws"
 
     def __handle_ws_message(self, ws_message):
         try:
             ws_message_json: dict = json.loads(ws_message)
-            action = ws_message_json.get("action")
-            if action == "update":
+
+            sequence = str(ws_message_json.get("sequence"))
+            if sequence and sequence in self.__pending_responses:
+                future = self.__pending_responses.pop(sequence)
+                if not future.done():
+                    future.set_result(ws_message_json)
+
+            action = ws_message_json.get(WS_MSG_ACTION)
+            if action == WS_MSG_ACTION_UPDATE:
                 deviceid = ws_message_json.get("deviceid")
                 params = ws_message_json.get("params")
                 if (
@@ -69,18 +109,6 @@ class EWeLinkWebSocketClient:
                         update_entity_state(deviceid, params)
         except json.JSONDecodeError as err:
             _LOGGER.error(err, "[EWeLink websocket] handle_ws_message error happen")
-
-    async def __get_ws_address(self):
-        """Get ws connect address."""
-        server_url = f"{self.__ws_base_url}/dispatch/app"
-        async with self.__session.get(
-            url=server_url, timeout=aiohttp.ClientTimeout(total=10)
-        ) as response:
-            data = await response.json()
-            error = data.get("error")
-            if error != 0:
-                raise EWeLinkApiError("Can not get ws connect address")
-            return f"wss://{data.get('domain')}/api/ws"
 
     async def connect_and_reconnect(self) -> None:
         """Connect to WebSocket server."""
@@ -102,14 +130,14 @@ class EWeLinkWebSocketClient:
                     self.__ws = ws
                     await ws.send_json(
                         {
-                            "action": "userOnline",
+                            "action": WS_MSG_ACTION_USER_ONLINE,
                             "apikey": self.__api_key,
                             "appid": self.__app_id,
                             "at": self.__access_token,
                             "nonce": gen_random_str(8),
-                            "sequence": now_timestamp(),
+                            "sequence": f"{now_timestamp()}",
                             "ts": int(round(time.time())),
-                            "userAgent": "pc_ewelink",
+                            "userAgent": WS_USER_AGENT,
                             "version": 8,
                         }
                     )
@@ -182,19 +210,39 @@ class EWeLinkWebSocketClient:
     async def control_device(self, ewelink_device: EWeLinkDevice, params: dict):
         """Control EWeLink device."""
         if (not self.__is_connected) or (ewelink_device is None):
-            return
+            return {"error": -1, "msg": "ws not connect or device is not exist."}
 
-        await self.__ws.send_json(
-            {
-                "action": "update",
-                "apikey": ewelink_device.apikey,
-                "deviceid": ewelink_device.device_id,
-                "params": params,
-                "selfApikey": "",
-                "sequence": now_timestamp(),
-                "userAgent": "pc_ewelink",
-            }
-        )
+        sequence = f"{now_timestamp()}"
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        self.__pending_responses[sequence] = future
+
+        command = {
+            "action": WS_MSG_ACTION_UPDATE,
+            "apikey": ewelink_device.apikey,
+            "deviceid": ewelink_device.device_id,
+            "params": params,
+            "selfApikey": self.__api_key,
+            "sequence": sequence,
+            "userAgent": WS_USER_AGENT,
+        }
+
+        try:
+            _LOGGER.info(
+                "[EWeLink websocket] control device send: %s", json.dumps(command)
+            )
+            await self.__ws.send_json(command)
+            return await asyncio.wait_for(future, timeout=10)
+        except TimeoutError:
+            _LOGGER.error(
+                "[EWeLink websocket] control device timeout. sequence: %s; deviceid: %s; params: %s",
+                sequence,
+                ewelink_device.device_id,
+                json.dumps(params),
+            )
+            if sequence in self.__pending_responses:
+                self.__pending_responses.pop(sequence)
+            return {"error": 408, "sequence": sequence, "msg": "Request Timeout"}
 
     @property
     def is_connected(self) -> bool:
