@@ -12,6 +12,12 @@ SWITCH_UIIDS = [
 ]
 
 
+class SENSOR_TYPE(StrEnum):
+    """Sensor type."""
+
+    RSSI = "rssi"
+
+
 class SWITCH_STATE(StrEnum):
     """Switch state enum."""
 
@@ -69,3 +75,7 @@ class Uiid:
                 ]
             }
         return {"switch": target}
+
+    def get_rssi_value(self, device: dict) -> int | None:
+        """Rssi value."""
+        return deep_get(device, ["itemData", "params", "rssi"], 0)

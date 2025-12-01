@@ -1,6 +1,6 @@
 """Uiid 1: single switch device."""
 
-from .uiid import PLATFORM, Uiid
+from .uiid import PLATFORM, SENSOR_TYPE, Uiid
 
 
 class Uiid1(Uiid):
@@ -13,4 +13,10 @@ class Uiid1(Uiid):
     @property
     def platform_config(self) -> list:
         """Platform config."""
-        return [{"platform": PLATFORM.SWITCH}]
+        return [
+            {"platform": PLATFORM.SWITCH},
+            {
+                "platform": PLATFORM.SENSOR,
+                "type": SENSOR_TYPE.RSSI,
+            },
+        ]

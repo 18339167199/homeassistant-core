@@ -58,9 +58,8 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         """Initialize the switch."""
         super().__init__(coordinator, device_id)
         self.config = config
-        self.device_id = device_id
-        self.device_coordinator = get_uiid_instance(self.ewelink_device.uiid)
-        self._device_info = DeviceInfo(
+        self.uiid_instance = get_uiid_instance(self.ewelink_device.uiid)
+        self.device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=self.ewelink_device.device_name,
             manufacturer=self.ewelink_device.manufacturer,
@@ -78,9 +77,9 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if switch is on."""
-        if not self.ewelink_device or not self.device_coordinator:
+        if not self.ewelink_device or not self.uiid_instance:
             return False
-        return self.device_coordinator.get_switch_state(self.ewelink_device.device)
+        return self.uiid_instance.get_switch_state(self.ewelink_device.device)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
@@ -94,7 +93,7 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         """Set switch state."""
         if not self.ewelink_device:
             return
-        params = self.device_coordinator.gen_control_switch_params(is_on)
+        params = self.uiid_instance.gen_control_switch_params(is_on)
         result = await self.coordinator.control_device(self.ewelink_device, params)
         if result is not None and result.get("error") == 0:
             self._async_write_ha_state()

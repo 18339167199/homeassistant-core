@@ -3,6 +3,7 @@
 from .uiid import (
     MULTIPLE_SINGLE_PROTOCOL_UIIDS,
     PLATFORM,
+    SENSOR_TYPE,
     SINGLE_PROTOCOL_UIIDS,
     SWITCH_STATE,
     SWITCH_UIIDS,
@@ -29,6 +30,7 @@ def get_uiid_instance(uiid):
 __all__ = [
     "MULTIPLE_SINGLE_PROTOCOL_UIIDS",
     "PLATFORM",
+    "SENSOR_TYPE",
     "SINGLE_PROTOCOL_UIIDS",
     "SWITCH_STATE",
     "SWITCH_UIIDS",

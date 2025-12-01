@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, Platform
+from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -19,6 +19,7 @@ from .const import (
     COORDINATOR,
     DOMAIN,
     EWELINK_API_AT_EXPIRED_TS,
+    PLATFORMS,
     REGION_DEFAULT,
     WS_CLIENT,
 )
@@ -27,8 +28,6 @@ from .utils import now_timestamp
 from .websocket import EWeLinkWebSocketClient
 
 _LOGGER = logging.getLogger(__name__)
-
-PLATFORMS: list[Platform] = [Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

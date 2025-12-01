@@ -22,7 +22,7 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
-        self._device_id = device_id
+        self.device_id = device_id
         device: EWeLinkDevice = coordinator.data[device_id]
         # Set device info
         self._attr_device_info = DeviceInfo(
@@ -38,5 +38,5 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
         if not super().available:
             return False
 
-        device = self.coordinator.data.get(self._device_id)
+        device = self.coordinator.data.get(self.device_id)
         return device is not None and device.online
