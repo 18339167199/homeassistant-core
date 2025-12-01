@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -15,8 +13,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import COORDINATOR, DOMAIN
 from .coordinator import EWeLinkDataCoordinator
 from .entity import EWeLinkEntity
-from .uiid import SWITCH_UIIDS, get_device_coordinator
-from .utils import get_device_uiid
+from .uiid import PLATFORM, get_uiid_instance
 
 
 async def async_setup_entry(
@@ -27,19 +24,25 @@ async def async_setup_entry(
     """Set up eWeLink switches from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id][COORDINATOR]
     entities: list[EWeLinkSwitch] = []
-    switch_and_toggle_device_dict = {
-        device_id: device
-        for device_id, device in coordinator.data.items()
-        if device.uiid in SWITCH_UIIDS
-    }
 
-    for device_id, device in switch_and_toggle_device_dict.items():
-        uiid = device.uiid
-        if uiid in SWITCH_UIIDS:
-            ewelink_switch_entity = EWeLinkSwitch(
-                coordinator=coordinator, device_id=device_id
-            )
-            entities.append(ewelink_switch_entity)
+    for device_id, device in coordinator.data.items():
+        uiid_instance = get_uiid_instance(device.uiid)
+        if (
+            uiid_instance is not None
+            and uiid_instance.platform_config is not None
+            and isinstance(uiid_instance.platform_config, list)
+            and len(uiid_instance.platform_config) > 0
+        ):
+            switch_config_list = [
+                config
+                for config in uiid_instance.platform_config
+                if config["platform"] == PLATFORM.SWITCH
+            ]
+            for switch_config in switch_config_list:
+                ewelink_switch_entity = EWeLinkSwitch(
+                    coordinator, device_id, switch_config
+                )
+                entities.append(ewelink_switch_entity)
 
     async_add_entities(entities, update_before_add=True)
 
@@ -49,15 +52,14 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
+    def __init__(
+        self, coordinator: EWeLinkDataCoordinator, device_id: str, config=None
+    ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, device_id)
-
+        self.config = config
         self.device_id = device_id
-
-        uiid = get_device_uiid(self.ewelink_device.device)
-        self.device_coordinator = get_device_coordinator(uiid)
-
+        self.device_coordinator = get_uiid_instance(self.ewelink_device.uiid)
         self._device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=self.ewelink_device.device_name,

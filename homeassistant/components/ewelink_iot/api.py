@@ -273,7 +273,10 @@ class EWeLinkApiClient:
                 data = await response.json()
                 self.__common_error_handler(data)
                 if data.get("error") == 0:
-                    device_list = deep_get(data, ["data", "thingList"], [])
+                    thing_list = deep_get(data, ["data", "thingList"], [])
+                    device_list = [
+                        item for item in thing_list if item.get("itemType") in [1, 2]
+                    ]
                     if len(device_list) > 0:
                         for device in device_list:
                             device_id = deep_get(device, ["itemData", "deviceid"])

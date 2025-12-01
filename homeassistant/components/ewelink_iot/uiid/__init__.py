@@ -1,24 +1,36 @@
 """EWeLink device uiid."""
 
-from .switch import SWITCH_UIIDS, get_switch_coordinator_by_uiid
+from .uiid import (
+    MULTIPLE_SINGLE_PROTOCOL_UIIDS,
+    PLATFORM,
+    SINGLE_PROTOCOL_UIIDS,
+    SWITCH_STATE,
+    SWITCH_UIIDS,
+    Uiid,
+)
+from .uiid_1 import Uiid1
+from .uiid_191 import Uiid191
 
-device_coordinator_dict = {}
+uiid_dict = {1: Uiid1, 191: Uiid191}
+uiid_instance_dict = {}
 
 
-def get_device_coordinator(uiid):
+def get_uiid_instance(uiid):
     """Get device coordinator."""
-    stored = device_coordinator_dict.get(uiid)
-
+    stored = uiid_instance_dict.get(uiid)
     if stored is not None:
         return stored
+    UiidClass = uiid_dict.get(uiid)
+    uiid_instance = UiidClass(uiid) if UiidClass is not None else Uiid(uiid)
+    uiid_instance_dict[uiid] = uiid_instance
+    return uiid_instance
 
-    DeviceCoordinator = None
-    device_coordinator = None
-    if uiid in SWITCH_UIIDS:
-        DeviceCoordinator = get_switch_coordinator_by_uiid(uiid)
 
-    if DeviceCoordinator:
-        device_coordinator = DeviceCoordinator(uiid)
-
-    device_coordinator_dict[uiid] = device_coordinator
-    return device_coordinator
+__all__ = [
+    "MULTIPLE_SINGLE_PROTOCOL_UIIDS",
+    "PLATFORM",
+    "SINGLE_PROTOCOL_UIIDS",
+    "SWITCH_STATE",
+    "SWITCH_UIIDS",
+    "get_uiid_instance",
+]
