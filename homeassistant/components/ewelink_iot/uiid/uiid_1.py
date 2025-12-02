@@ -4,7 +4,7 @@ from .uiid import PLATFORM, SENSOR_TYPE, Uiid
 
 
 class Uiid1(Uiid):
-    """Uiid 1 coordinator."""
+    """Uiid 1."""
 
     def __init__(self, *args, **kwargs) -> None:
         """Init."""
