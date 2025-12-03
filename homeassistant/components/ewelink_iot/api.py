@@ -15,6 +15,7 @@ from typing import Any
 import aiohttp
 
 from homeassistant.const import CONF_PASSWORD
+from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .const import CONF_COUNTRY_CODE, DEV_MODE, EWELINK_API_MAP, REGION_CN, REGIONS_MAP
 from .utils import deep_get, gen_random_str, is_valid_email, now_timestamp
@@ -180,7 +181,9 @@ class EWeLinkApiClient:
         if error == 0:
             return
         if error in (401, 403):
-            raise EWeLinkAuthError(f"Authentication failed, ${error_msg}")
+            raise ConfigEntryAuthFailed(
+                "Access credentials have expired, please log in again."
+            )
         raise EWeLinkApiError(error_msg)
 
     def set_at_updated_ts(self, ts: int):

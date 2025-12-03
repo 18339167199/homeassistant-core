@@ -9,7 +9,7 @@ from homeassistant.const import Platform
 DEV_MODE = os.getenv("HA_DEV_MODE") == "1"
 
 DOMAIN: Final = "ewelink_iot"
-PLATFORMS: Final = [Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: Final = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
 EWELINK_API_CN: Final = "https://cn-apia.coolkit.cn"
 EWELINK_API_AS: Final = "https://as-apia.coolkit.cc"

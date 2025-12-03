@@ -22,6 +22,12 @@ class SENSOR_TYPE(StrEnum):
     BATTERY = "battery"
 
 
+class BINARY_SENSOR_TYPE(StrEnum):
+    """Binary sensor type."""
+
+    DOOR = "door"
+
+
 class SWITCH_STATE(StrEnum):
     """Switch state enum."""
 
@@ -35,6 +41,7 @@ class PLATFORM(StrEnum):
     SWITCH = "switch"
     SENSOR = "sensor"
     LIGHT = "light"
+    BINARY_SENSOR = "binary_sensor"
 
 
 class Uiid:
@@ -104,3 +111,8 @@ class Uiid:
         if isinstance(value, numbers.Number):
             return round(value)
         return round(int(value))
+
+    def get_door_lock_value(self, device: dict) -> bool | None:
+        """Get door sensor lock value."""
+        value = deep_get(device, ["itemData", "params", "lock"], None)
+        return bool(value)

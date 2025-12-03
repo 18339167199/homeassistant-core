@@ -1,6 +1,7 @@
 """EWeLink device uiid."""
 
 from .uiid import (
+    BINARY_SENSOR_TYPE,
     MULTIPLE_SINGLE_PROTOCOL_UIIDS,
     PLATFORM,
     SENSOR_TYPE,
@@ -11,9 +12,10 @@ from .uiid import (
 )
 from .uiid_1 import Uiid1
 from .uiid_191 import Uiid191
+from .uiid_7003 import Uiid7003
 from .uiid_7014 import Uiid7014
 
-uiid_dict = {1: Uiid1, 191: Uiid191, 7014: Uiid7014}
+uiid_dict = {1: Uiid1, 191: Uiid191, 7003: Uiid7003, 7014: Uiid7014}
 uiid_instance_dict = {}
 
 
@@ -29,6 +31,7 @@ def get_uiid_instance(uiid):
 
 
 __all__ = [
+    "BINARY_SENSOR_TYPE",
     "MULTIPLE_SINGLE_PROTOCOL_UIIDS",
     "PLATFORM",
     "SENSOR_TYPE",
