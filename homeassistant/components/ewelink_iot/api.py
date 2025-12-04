@@ -255,7 +255,6 @@ class EWeLinkApiClient:
                         for family in family_list
                         if family.get("familyType") in [1, 2]
                     ]
-                _LOGGER.info("Get familly list: %s", json.dumps(self.__family_list))
                 return data
         except aiohttp.ClientError as err:
             _LOGGER.error("Get family aiohttp.ClientError happen: %s", err)

@@ -14,8 +14,9 @@ from .uiid_1 import Uiid1
 from .uiid_191 import Uiid191
 from .uiid_7003 import Uiid7003
 from .uiid_7014 import Uiid7014
+from .uiid_7016 import Uiid7016
 
-uiid_dict = {1: Uiid1, 191: Uiid191, 7003: Uiid7003, 7014: Uiid7014}
+uiid_dict = {1: Uiid1, 191: Uiid191, 7003: Uiid7003, 7014: Uiid7014, 7016: Uiid7016}
 uiid_instance_dict = {}
 
 

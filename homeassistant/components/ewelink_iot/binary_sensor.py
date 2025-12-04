@@ -46,6 +46,10 @@ async def async_setup_entry(
                     ewelink_binary_sensor_entity = EWeLinkDoorBinarySensor(
                         coordinator, device_id
                     )
+                elif binary_sensor_type == BINARY_SENSOR_TYPE.HUMAN:
+                    ewelink_binary_sensor_entity = EWeLinkHumanBinarySensor(
+                        coordinator, device_id
+                    )
 
                 if ewelink_binary_sensor_entity is not None:
                     entities.append(ewelink_binary_sensor_entity)
@@ -81,7 +85,7 @@ class EWeLinkDoorBinarySensor(EWeLinkBinarySensor):
 
     _attr_device_class = BinarySensorDeviceClass.DOOR
 
-    def __init__(self, coordinator, device_id) -> None:
+    def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
         """Init."""
         super().__init__(coordinator, device_id)
         self._attr_unique_id = f"ewelink_lot_{device_id}_door_binary_sensor"
@@ -90,3 +94,19 @@ class EWeLinkDoorBinarySensor(EWeLinkBinarySensor):
     def is_on(self) -> bool | None:
         """Get door binary sensor state."""
         return self.uiid_instance.get_door_lock_value(self.ewelink_device.device)
+
+
+class EWeLinkHumanBinarySensor(EWeLinkBinarySensor):
+    """EWeLink human binary sensor."""
+
+    _attr_device_class = BinarySensorDeviceClass.PRESENCE
+
+    def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
+        """Init."""
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{device_id}_human_binary_sensor"
+
+    @property
+    def is_on(self) -> bool | None:
+        """Get huamn exist value."""
+        return self.uiid_instance.get_human_exsit_value(self.ewelink_device.device)

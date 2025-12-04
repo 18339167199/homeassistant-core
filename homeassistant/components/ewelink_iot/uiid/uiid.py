@@ -26,6 +26,7 @@ class BINARY_SENSOR_TYPE(StrEnum):
     """Binary sensor type."""
 
     DOOR = "door"
+    HUMAN = "human"
 
 
 class SWITCH_STATE(StrEnum):
@@ -115,4 +116,9 @@ class Uiid:
     def get_door_lock_value(self, device: dict) -> bool | None:
         """Get door sensor lock value."""
         value = deep_get(device, ["itemData", "params", "lock"], None)
+        return bool(value)
+
+    def get_human_exsit_value(self, device: dict) -> bool | None:
+        """Get human sensor exist value."""
+        value = deep_get(device, ["itemData", "params", "human"], None)
         return bool(value)
