@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
+import numbers
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import EWeLinkApiClient, EWeLinkApiError, EWeLinkDevice
-from .utils import get_device_uiid, merge
+from .uiid import get_uiid_instance
+from .utils import deep_get, get_device_uiid, merge
 from .websocket import EWeLinkWebSocketClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +39,11 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
         self.api_client = api_client
         self.ws_client = ws_client
         self.data = {}
+        self.event_handler_map = {}
+
+    def add_event_handler(self, key, handler):
+        """Add event entity handler."""
+        self.event_handler_map[key] = handler
 
     async def _async_update_data(self) -> dict[str, EWeLinkDevice]:
         """Fetch data from API."""
@@ -54,12 +61,27 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
             {"update_entity_state": self.update_entity_state}
         )
 
-    def update_entity_state(self, deviceid, params):
+    def update_entity_state(self, device_id, params):
         """Update entity state."""
-        device = self.data.get(deviceid)
+        device = self.data.get(device_id)
         uiid = get_device_uiid(device.device)
         if device is None or uiid is None:
             return
+
+        uiid_instance = get_uiid_instance(uiid)
+        if (
+            uiid_instance
+            and hasattr(uiid_instance, "event_types")
+            and isinstance(uiid_instance.event_types, list)
+            and len(uiid_instance.event_types) > 0
+        ):
+            outlet = deep_get(params, ["outlet"], 0)
+            key = deep_get(params, ["key"])
+            if isinstance(outlet, numbers.Number) and isinstance(key, numbers.Number):
+                handler_key = f"{device_id}_{outlet}"
+                event_handler = self.event_handler_map[handler_key]
+                if event_handler is not None:
+                    event_handler(outlet, key)
 
         merge(device.device, {"itemData": {"params": params}})
         self.async_set_updated_data(self.data)

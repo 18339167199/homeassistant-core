@@ -43,6 +43,21 @@ class PLATFORM(StrEnum):
     SENSOR = "sensor"
     LIGHT = "light"
     BINARY_SENSOR = "binary_sensor"
+    EVENT = "event"
+
+
+class EVENT_ENTITY_TYPE(StrEnum):
+    """Event entity type."""
+
+    BUTTON = "button"
+
+
+class EVNET_TYPE(StrEnum):
+    """Event type."""
+
+    SINGLE_PRESS = "single_press"
+    DOUBLE_PRESS = "double_press"
+    LONG_PRESS = "long_press"
 
 
 class Uiid:

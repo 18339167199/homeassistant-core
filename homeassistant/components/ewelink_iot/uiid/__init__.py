@@ -2,6 +2,8 @@
 
 from .uiid import (
     BINARY_SENSOR_TYPE,
+    EVENT_ENTITY_TYPE,
+    EVNET_TYPE,
     MULTIPLE_SINGLE_PROTOCOL_UIIDS,
     PLATFORM,
     SENSOR_TYPE,
@@ -11,12 +13,20 @@ from .uiid import (
     Uiid,
 )
 from .uiid_1 import Uiid1
+from .uiid_174 import Uiid174
 from .uiid_191 import Uiid191
 from .uiid_7003 import Uiid7003
 from .uiid_7014 import Uiid7014
 from .uiid_7016 import Uiid7016
 
-uiid_dict = {1: Uiid1, 191: Uiid191, 7003: Uiid7003, 7014: Uiid7014, 7016: Uiid7016}
+uiid_dict = {
+    1: Uiid1,
+    174: Uiid174,
+    191: Uiid191,
+    7003: Uiid7003,
+    7014: Uiid7014,
+    7016: Uiid7016,
+}
 uiid_instance_dict = {}
 
 
@@ -33,6 +43,8 @@ def get_uiid_instance(uiid):
 
 __all__ = [
     "BINARY_SENSOR_TYPE",
+    "EVENT_ENTITY_TYPE",
+    "EVNET_TYPE",
     "MULTIPLE_SINGLE_PROTOCOL_UIIDS",
     "PLATFORM",
     "SENSOR_TYPE",
