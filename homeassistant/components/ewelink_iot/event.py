@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.event import EventDeviceClass, EventEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -12,6 +12,7 @@ from .const import COORDINATOR, DOMAIN
 from .coordinator import EWeLinkDataCoordinator
 from .entity import EWeLinkEntity
 from .uiid import EVENT_ENTITY_TYPE, PLATFORM, get_uiid_instance
+from .utils import gen_event_callback_key
 
 
 async def async_setup_entry(
@@ -111,6 +112,7 @@ class EWeLinkButtonEvent(EWeLinkEvent):
         self._last_event = value
         return value
 
+    @callback
     def handle_trigger_event(self, outlet, key, event_attributes=None):
         """Trigger event."""
         event_type = self.uiid_instance.key_2_event_type(key)
@@ -118,7 +120,13 @@ class EWeLinkButtonEvent(EWeLinkEvent):
             self._trigger_event(event_type, event_attributes)
 
     async def async_added_to_hass(self) -> None:
-        """Register callbacks with your device API/library."""
+        """Register callbacks with your event entity added."""
         await super().async_added_to_hass()
-        key = f"{self.device_id}_{self.outlet}"
+        key = gen_event_callback_key(self.device_id, self.outlet)
         self.coordinator.add_event_handler(key, self.handle_trigger_event)
+
+    async def async_will_remove_from_hass(self):
+        """Unregister callbacks when delete event entity."""
+        await super().async_will_remove_from_hass()
+        key = gen_event_callback_key(self.device_id, self.outlet)
+        self.coordinator.remove_event_handler(key)

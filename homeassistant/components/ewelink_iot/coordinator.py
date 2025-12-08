@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import EWeLinkApiClient, EWeLinkApiError, EWeLinkDevice
 from .uiid import get_uiid_instance
-from .utils import deep_get, get_device_uiid, merge
+from .utils import deep_get, gen_event_callback_key, get_device_uiid, merge
 from .websocket import EWeLinkWebSocketClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,6 +44,11 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
     def add_event_handler(self, key, handler):
         """Add event entity handler."""
         self.event_handler_map[key] = handler
+
+    def remove_event_handler(self, key):
+        """Remove event entity handler."""
+        if key in self.event_handler_map:
+            self.event_handler_map.pop(key)
 
     async def _async_update_data(self) -> dict[str, EWeLinkDevice]:
         """Fetch data from API."""
@@ -78,7 +83,7 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
             outlet = deep_get(params, ["outlet"], 0)
             key = deep_get(params, ["key"])
             if isinstance(outlet, numbers.Number) and isinstance(key, numbers.Number):
-                handler_key = f"{device_id}_{outlet}"
+                handler_key = gen_event_callback_key(device_id, outlet)
                 event_handler = self.event_handler_map[handler_key]
                 if event_handler is not None:
                     event_handler(outlet, key)

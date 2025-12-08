@@ -66,3 +66,8 @@ def merge(origin_dict: dict[Any, Any], source_dict: dict[Any, Any]) -> dict[Any,
             origin_dict[key] = value
 
     return origin_dict
+
+
+def gen_event_callback_key(device_id: str, outlet: int, component="event"):
+    """Gen event callback key."""
+    return f"{component}_{device_id}_{outlet}"
