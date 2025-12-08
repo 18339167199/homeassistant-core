@@ -219,7 +219,9 @@ class EWeLinkApiClient:
                             f"User account not exist, {error_msg}"
                         )
                     if error in [10001, 10014]:
-                        raise EWeLinkApiError(f"Account or password error, {error_msg}")
+                        raise EWeLinkAuthError(
+                            f"Account or password error, {error_msg}"
+                        )
                 self.__common_error_handler(data)
                 # Extract authentication data
                 user_data = data.get("data", {}).get("user", {})

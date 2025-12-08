@@ -143,13 +143,23 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                     app_secret=APP_SECRET,
                 )
 
-                # login with user account
-                await api_client.login()
+                # re login with user account
+                user_data = await api_client.login()
 
+                old_user_input = reauth_entry.data.get("user_input")
+                new_user_input = {
+                    CONF_ACCOUNT: old_user_input.get(CONF_ACCOUNT),
+                    CONF_REGION: old_user_input.get(CONF_REGION),
+                    CONF_PASSWORD: user_input.get(CONF_PASSWORD),
+                }
                 # Update config entry
                 return self.async_update_reload_and_abort(
                     reauth_entry,
-                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    data_updates={
+                        "user_input": new_user_input,
+                        "user_data": user_data,
+                        "at_updated_ts": now_timestamp(),
+                    },
                 )
 
             except EWeLinkAuthError:
