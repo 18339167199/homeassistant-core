@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.light import ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -36,7 +38,7 @@ async def async_setup_entry(
             ]
             for light_config in light_config_list:
                 ewelink_light_entity = EWeLinKLight(
-                    coordinator, device_id, light_config
+                    coordinator, device_id, light_config.get("config")
                 )
                 entities.append(ewelink_light_entity)
 
@@ -45,6 +47,8 @@ async def async_setup_entry(
 
 class EWeLinKLight(EWeLinkEntity, LightEntity):
     """Representation of an ewelink event."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self, coordinator: EWeLinkDataCoordinator, device_id: str, config=None
@@ -57,55 +61,60 @@ class EWeLinKLight(EWeLinkEntity, LightEntity):
     @property
     def supported_color_modes(self) -> set[ColorMode]:
         """Light support color mode."""
-        if hasattr(self.config, "supported_color_modes") and isinstance(
-            self.config.supported_color_modes, list
-        ):
-            return set(self.config.supported_color_modes)
+        if hasattr(self.uiid_instance, "supported_color_modes"):
+            return self.uiid_instance.supported_color_modes
         return set()
 
     @property
     def color_mode(self) -> ColorMode | None:
         """Light color mode."""
-        return None
+        return self.uiid_instance.get_color_mode(self.ewelink_device.device)
 
     @property
     def brightness(self) -> int | None:
         """Light brightness."""
-        return 55
+        return self.uiid_instance.get_brightess(self.ewelink_device.device)
 
     @property
-    def rgb_color(self):
+    def rgb_color(self) -> tuple[int, int, int] | None:
         """Light rgb color."""
-        return (100, 255, 200)  # r, g, b
+        return self.uiid_instance.get_color_rgb(self.ewelink_device.device)
 
     @property
     def color_temp_kelvin(self):
         """Light color temp."""
-        return 4000
+        return self.uiid_instance.get_color_temp_kelvin(self.ewelink_device.device)
 
     @property
     def max_color_temp_kelvin(self):
         """Return the max color temp kelvin."""
-        return 65535
+        if hasattr(self.uiid_instance, "max_color_temp_kelvin"):
+            return self.uiid_instance.max_color_temp_kelvin
+        return 6535
 
     @property
     def min_color_temp_kelvin(self):
         """Return the min color temp kelvin."""
+        if hasattr(self.uiid_instance, "min_color_temp_kelvin"):
+            return self.uiid_instance.min_color_temp_kelvin
         return 2000
 
     @property
     def is_on(self) -> bool:
         """Light is on."""
-        return self.uiid_instance.get_light_on_state(self.ewelink_device.device)
+        return self.uiid_instance.get_switch_state(self.ewelink_device.device)
 
-    def _control_switch(self, state: bool):
+    async def _async_set_switch_state(self, is_on: bool) -> None:
         """Control light switch."""
-        pass
+        params = self.uiid_instance.get_switch_state(is_on)
+        result = await self.coordinator.control_device(self.ewelink_device, params)
+        if result is not None and result.get("error") == 0:
+            self.async_write_ha_state()
 
-    def turn_on(self, **kwargs):
+    async def turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
-        return super().turn_on(**kwargs)
+        await self._async_set_switch_state(True)
 
-    def turn_off(self, **kwargs):
+    async def turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
-        return super().turn_off(**kwargs)
+        await self._async_set_switch_state(False)

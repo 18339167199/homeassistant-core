@@ -75,11 +75,6 @@ class Uiid:
     def get_switch_state(self, device: dict) -> bool:
         """Get ewelink switch device switch state."""
         uiid = get_device_uiid(device)
-        if uiid in SINGLE_PROTOCOL_UIIDS:
-            return (
-                deep_get(device, ["itemData", "params", "switch"], SWITCH_STATE.OFF)
-                == SWITCH_STATE.ON
-            )
         if uiid in MULTIPLE_SINGLE_PROTOCOL_UIIDS:
             return (
                 deep_get(
@@ -89,7 +84,11 @@ class Uiid:
                 )
                 == SWITCH_STATE.ON
             )
-        return False
+
+        return (
+            deep_get(device, ["itemData", "params", "switch"], SWITCH_STATE.OFF)
+            == SWITCH_STATE.ON
+        )
 
     def gen_control_switch_params(self, is_on: bool):
         "Gen control switch params."
@@ -137,7 +136,3 @@ class Uiid:
         """Get human sensor exist value."""
         value = deep_get(device, ["itemData", "params", "human"], None)
         return bool(value)
-
-    def get_light_on_state(self, device: dict) -> bool:
-        """Return True if light is on."""
-        return deep_get(device, ["itemData", "params", "switch"]) == SWITCH_STATE.ON
