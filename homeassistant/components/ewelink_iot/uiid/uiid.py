@@ -72,7 +72,7 @@ class Uiid:
         """Platform placeholder."""
         return []
 
-    def get_switch_state(self, device: dict):
+    def get_switch_state(self, device: dict) -> bool:
         """Get ewelink switch device switch state."""
         uiid = get_device_uiid(device)
         if uiid in SINGLE_PROTOCOL_UIIDS:
@@ -137,3 +137,7 @@ class Uiid:
         """Get human sensor exist value."""
         value = deep_get(device, ["itemData", "params", "human"], None)
         return bool(value)
+
+    def get_light_on_state(self, device: dict) -> bool:
+        """Return True if light is on."""
+        return deep_get(device, ["itemData", "params", "switch"]) == SWITCH_STATE.ON

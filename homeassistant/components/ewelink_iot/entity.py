@@ -8,6 +8,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api import EWeLinkDevice
 from .const import DOMAIN
 from .coordinator import EWeLinkDataCoordinator
+from .uiid import get_uiid_instance
+from .utils import get_device_uiid
 
 
 class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
@@ -22,14 +24,17 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
-        self.device_id = device_id
         device: EWeLinkDevice = coordinator.data[device_id]
-        # Set device info
+        uiid = get_device_uiid(device.device)
+        self.device_id = device_id
+        self.uiid = uiid
+        self.uiid_instance = get_uiid_instance(uiid)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=device.device_name,
             manufacturer=device.brand_name,
             model=device.model,
+            serial_number=device_id,
         )
 
     @property
@@ -40,3 +45,8 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
 
         device = self.coordinator.data.get(self.device_id)
         return device is not None and device.online
+
+    @property
+    def ewelink_device(self):
+        """Get EWeLinkDevice instance."""
+        return self.coordinator.data.get(self.device_id)
