@@ -3,6 +3,7 @@
 import random
 import string
 import time
+from typing import Any
 
 
 def gen_random_str(len=8, charsets: None | list = None) -> str:
@@ -43,3 +44,36 @@ def now_timestamp():
 def get_device_uiid(device: dict) -> int:
     """Get device uiid."""
     return deep_get(device, ["itemData", "extra", "uiid"])
+
+
+def map_value_general(
+    input_value: float, input_range: list[int, int], target_range: list[int, int]
+) -> float:
+    """Range mapping."""
+
+    R_MIN, R_MAX = input_range
+    T_MIN, T_MAX = target_range
+
+    if R_MAX == R_MIN:
+        return T_MIN
+
+    if input_value < R_MIN or input_value > R_MAX:
+        raise ValueError(f"value must in {R_MIN} - {R_MAX}. got {input_value}")
+
+    normalized_position = (input_value - R_MIN) / (R_MAX - R_MIN)
+    target_range_size = T_MAX - T_MIN
+    return (normalized_position * target_range_size) + T_MIN
+
+
+def merge(origin_dict: dict[Any, Any], source_dict: dict[Any, Any]) -> dict[Any, Any]:
+    """Merge source dict to origin dict."""
+    for key, value in source_dict.items():
+        if key in origin_dict:
+            if isinstance(origin_dict[key], dict) and isinstance(value, dict):
+                merge(origin_dict[key], value)
+            else:
+                origin_dict[key] = value
+        else:
+            origin_dict[key] = value
+
+    return origin_dict

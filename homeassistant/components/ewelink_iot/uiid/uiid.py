@@ -3,6 +3,8 @@
 from enum import StrEnum
 import numbers
 
+from homeassistant.components.light import DEFAULT_MAX_KELVIN, DEFAULT_MIN_KELVIN
+
 from ..utils import deep_get, get_device_uiid
 
 SINGLE_PROTOCOL_UIIDS = [1]
@@ -71,6 +73,21 @@ class Uiid:
     def platform_config(self):
         """Platform placeholder."""
         return []
+
+    @property
+    def min_color_temp_kelvin(self) -> int:
+        """Get light min color temp."""
+        return DEFAULT_MIN_KELVIN
+
+    @property
+    def max_color_temp_kelvin(self) -> int:
+        """Get light max color temp."""
+        return DEFAULT_MAX_KELVIN
+
+    @property
+    def ha_brightness_range(self):
+        """HA brightness range."""
+        return [1, 255]
 
     def get_switch_state(self, device: dict) -> bool:
         """Get ewelink switch device switch state."""

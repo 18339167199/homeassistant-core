@@ -5,7 +5,7 @@ import numbers
 from homeassistant.components.light import ColorMode
 
 from .uiid import PLATFORM, Uiid
-from .utils import deep_get
+from .utils import deep_get, map_value_general, merge
 
 
 class Uiid104(Uiid):
@@ -14,6 +14,8 @@ class Uiid104(Uiid):
     def __init__(self, *args, **kwargs) -> None:
         """Init."""
         super().__init__(uiid=104)
+        self.ewelink_color_temp_range = [0, 255]
+        self.ewelink_brightness_range = [1, 100]
 
     @property
     def platform_config(self) -> list:
@@ -24,16 +26,6 @@ class Uiid104(Uiid):
     def supported_color_modes(self) -> set[ColorMode]:
         """Supported color modes."""
         return {ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP, ColorMode.RGB}
-
-    @property
-    def max_color_temp_kelvin(self) -> int:
-        """Get light max color temp."""
-        return 6535
-
-    @property
-    def min_color_temp_kelvin(self) -> int:
-        """Get light min color temp."""
-        return 2000
 
     def get_ltype(self, device: dict) -> str:
         """Get light ltype."""
@@ -50,8 +42,19 @@ class Uiid104(Uiid):
 
     def get_brightess(self, device: dict) -> int | None:
         """Get light brightess."""
-        ltype = self.get_ltype(device)
-        return deep_get(device, ["itemData", "params", ltype, "br"])
+        try:
+            ltype = self.get_ltype(device)
+            br = deep_get(device, ["itemData", "params", ltype, "br"])
+            if isinstance(br, numbers.Number):
+                return round(
+                    map_value_general(
+                        br, self.ewelink_brightness_range, self.ha_brightness_range
+                    )
+                )
+        except ValueError:
+            return None
+        else:
+            return None
 
     def get_color_rgb(self, device: dict) -> tuple[int, int, int] | None:
         """Return light color rgb tuple."""
@@ -65,15 +68,58 @@ class Uiid104(Uiid):
 
     def get_color_temp_kelvin(self, device: dict) -> int | None:
         """Get color temp kelvin."""
+        try:
+            ltype = self.get_ltype(device)
+            ct = deep_get(device, ["itemData", "params", ltype, "ct"])  # range: 0-255
+            if isinstance(ct, numbers.Number):
+                return round(
+                    map_value_general(
+                        ct,
+                        self.ewelink_color_temp_range,
+                        [self.min_color_temp_kelvin, self.max_color_temp_kelvin],
+                    )
+                )
+        except ValueError:
+            return None
+        else:
+            return None
+
+    def gen_control_color_temp_params(self, device: dict, color_temp_kelvin: int):
+        """Gen control color temp params."""
+        br = deep_get(device, ["itemData", "params", "white", "br"], 50)
+        ct = map_value_general(
+            color_temp_kelvin,
+            [self.min_color_temp_kelvin, self.max_color_temp_kelvin],
+            self.ewelink_color_temp_range,
+        )
+        return {"ltype": "white", "white": {"br": br, "ct": round(ct)}}
+
+    def gen_control_color_rgb_params(self, device: dict, color_rgb: tuple):
+        """Gen control color rgb params."""
+        br = deep_get(device, ["itemData", "params", "color", "br"], 50)
+        r, g, b = color_rgb
+        return {"ltype": "color", "color": {"r": r, "g": g, "b": b, "br": br}}
+
+    def gen_control_brightness_params(self, device: dict, brightness: int):
+        """Gen control brightness params."""
         ltype = self.get_ltype(device)
-        ct = deep_get(device, ["itemData", "params", ltype, "ct"])  # range: 0-255
-        if isinstance(ct, numbers.Number):
-            if ct <= 0:
-                return self.min_color_temp_kelvin
-            if ct >= 255:
-                return self.max_color_temp_kelvin
-            return int(
-                (self.max_color_temp_kelvin - self.min_color_temp_kelvin) / 255 * ct
-                + self.min_color_temp_kelvin
+        params = {"ltype": ltype}
+        ewelinl_br = round(
+            map_value_general(
+                brightness, self.ha_brightness_range, self.ewelink_brightness_range
             )
-        return None
+        )
+        if ltype == "color":
+            ewelink_color = deep_get(device, ["itemData", "params", "color"], {})
+            params["color"] = {
+                "br": ewelinl_br,
+                "r": ewelink_color.get("r", 100),
+                "g": ewelink_color.get("g", 100),
+                "b": ewelink_color.get("b", 100),
+            }
+        else:
+            params["white"] = {
+                "br": ewelinl_br,
+                "ct": deep_get(device, ["itemData", "params", "white", "ct"], 100),
+            }
+        return params
