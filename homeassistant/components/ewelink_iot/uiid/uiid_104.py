@@ -5,7 +5,7 @@ import numbers
 from homeassistant.components.light import ColorMode
 
 from .uiid import PLATFORM, Uiid
-from .utils import deep_get, map_value_general, merge
+from .utils import deep_get, map_value_general
 
 
 class Uiid104(Uiid):
@@ -25,7 +25,7 @@ class Uiid104(Uiid):
     @property
     def supported_color_modes(self) -> set[ColorMode]:
         """Supported color modes."""
-        return {ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP, ColorMode.RGB}
+        return {ColorMode.COLOR_TEMP, ColorMode.RGB}
 
     def get_ltype(self, device: dict) -> str:
         """Get light ltype."""
@@ -44,7 +44,7 @@ class Uiid104(Uiid):
         """Get light brightess."""
         try:
             ltype = self.get_ltype(device)
-            br = deep_get(device, ["itemData", "params", ltype, "br"])
+            br: int = deep_get(device, ["itemData", "params", ltype, "br"])
             if isinstance(br, numbers.Number):
                 return round(
                     map_value_general(
@@ -56,21 +56,24 @@ class Uiid104(Uiid):
         else:
             return None
 
-    def get_color_rgb(self, device: dict) -> tuple[int, int, int] | None:
+    def get_color_rgb(self, device: dict) -> tuple | None:
         """Return light color rgb tuple."""
         color = deep_get(device, ["itemData", "params", "color"], {})
         if isinstance(color, dict):
-            r = color.get("r")
-            g = color.get("g")
-            b = color.get("b")
-            return (r, g, b)
+            r: int | None = color.get("r")
+            g: int | None = color.get("g")
+            b: int | None = color.get("b")
+            if r is not None and g is not None and b is not None:
+                return (r, g, b)
         return (100, 100, 100)
 
     def get_color_temp_kelvin(self, device: dict) -> int | None:
         """Get color temp kelvin."""
         try:
             ltype = self.get_ltype(device)
-            ct = deep_get(device, ["itemData", "params", ltype, "ct"])  # range: 0-255
+            ct: int = deep_get(
+                device, ["itemData", "params", ltype, "ct"]
+            )  # range: 0-255
             if isinstance(ct, numbers.Number):
                 return round(
                     map_value_general(
@@ -103,7 +106,7 @@ class Uiid104(Uiid):
     def gen_control_brightness_params(self, device: dict, brightness: int):
         """Gen control brightness params."""
         ltype = self.get_ltype(device)
-        params = {"ltype": ltype}
+        params: dict = {"ltype": ltype}
         ewelinl_br = round(
             map_value_general(
                 brightness, self.ha_brightness_range, self.ewelink_brightness_range

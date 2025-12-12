@@ -27,7 +27,7 @@ class Uiid174(Uiid):
             EVNET_TYPE.LONG_PRESS,
         ]
 
-    def key_2_event_type(self, key: int | None):
+    def key_2_event_type(self, key: int):
         """Key to event type."""
         return event_type_dict.get(key)
 
@@ -79,7 +79,7 @@ class Uiid174(Uiid):
             },
         ]
 
-    def get_outlet_state(self, device) -> EVENT_ENTITY_TYPE:
+    def get_outlet_state(self, device):
         """Get outlet state."""
         key = deep_get(device, ["itemData", "params", "key"])
         event_type = event_type_dict.get(key) if type(key) is int else None

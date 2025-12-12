@@ -1,6 +1,7 @@
 {
   "domain": "ewelink_iot",
   "name": "eWeLink IoT",
+  "version": "1.0.0",
   "codeowners": [],
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/ewelink_iot",
