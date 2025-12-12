@@ -11,11 +11,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    UnitOfTemperature,
     EntityCategory,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import COORDINATOR, DOMAIN
@@ -47,7 +46,7 @@ async def async_setup_entry(
                 if config["platform"] == PLATFORM.SENSOR
             ]
             for sensor_config in sensor_config_list:
-                ewelink_sensor_entity = None
+                ewelink_sensor_entity: EWeLinkSensor | None = None
                 sensor_type = sensor_config.get("type")
                 if sensor_type == SENSOR_TYPE.RSSI:
                     ewelink_sensor_entity = EWeLinkRssiSensor(coordinator, device_id)
@@ -76,19 +75,6 @@ class EWeLinkSensor(EWeLinkEntity, SensorEntity):
     def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, device_id)
-        self.uiid_instance = get_uiid_instance(self.ewelink_device.uiid)
-        self.device_info = DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=self.ewelink_device.device_name,
-            manufacturer=self.ewelink_device.manufacturer,
-            model=self.ewelink_device.model,
-            serial_number=device_id,
-        )
-
-    @property
-    def ewelink_device(self):
-        """Get EWeLinkDevice instance."""
-        return self.coordinator.data.get(self.device_id)
 
 
 class EWeLinkRssiSensor(EWeLinkSensor):
@@ -126,7 +112,7 @@ class EWeLinkTemperatureSensor(EWeLinkSensor):
 
     @property
     def native_value(self):
-        """Rssi value."""
+        """Temperature value."""
         return self.uiid_instance.get_temperature_value(self.ewelink_device.device)
 
 
@@ -143,7 +129,7 @@ class EWeLinkHumiditySensor(EWeLinkSensor):
 
     @property
     def native_value(self):
-        """Rssi value."""
+        """Humidity value."""
         return self.uiid_instance.get_humidity_value(self.ewelink_device.device)
 
 
@@ -160,6 +146,6 @@ class EWeLinkBatterySensor(EWeLinkSensor):
         self._attr_unique_id = f"ewelink_lot_{device_id}_battery_sensor"
 
     @property
-    def native_value(self):
-        """Rssi value."""
+    def native_value(self) -> int | None:
+        """Battery value."""
         return self.uiid_instance.get_battery_value(self.ewelink_device.device)

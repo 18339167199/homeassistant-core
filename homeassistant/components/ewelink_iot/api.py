@@ -88,7 +88,7 @@ class EWeLinkAuthError(EWeLinkApiError):
 
 
 class EWeLinkAccountNotExist(EWeLinkApiError):
-    """Exception rasied for eWeLink account not exist."""
+    """Exception raised for eWeLink account not exist."""
 
 
 class EWeLinkConnectionError(EWeLinkApiError):
@@ -230,7 +230,7 @@ class EWeLinkApiClient:
 
                 _LOGGER.info("Successfully logged in to eWeLink")
                 self.__user_data = data.get("data", {})
-                self.set_at_updated_ts(now_timestamp)
+                self.set_at_updated_ts(now_timestamp())
                 return self.__user_data
 
         except aiohttp.ClientError as err:
@@ -308,46 +308,13 @@ class EWeLinkApiClient:
         else:
             return self.device_dict
 
-    async def set_device_status(
-        self, device_id: str, params: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Set device status."""
-        url = f"{self.__api_base_url}/device/thing/status"
-        headers = self.__get_headers()
-
-        payload = {
-            "type": 1,
-            "id": device_id,
-            "params": params,
-        }
-
-        try:
-            async with self.__session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as response:
-                data = await response.json()
-
-                if data.get("error") != 0:
-                    error_msg = data.get("msg", "Unknown error")
-                    raise EWeLinkApiError(f"Failed to set device status: {error_msg}")
-
-                return data.get("data", {})
-
-        except aiohttp.ClientError as err:
-            raise EWeLinkConnectionError(f"Connection error: {err}") from err
-        except TimeoutError as err:
-            raise EWeLinkConnectionError("Request timeout") from err
-
     @property
     def session(self):
-        """Get aiohttp seesion object."""
+        """Get aiohttp session object."""
         return self.__session
 
     @property
-    def api_key(self) -> str | None:
+    def api_key(self) -> str:
         """Get api key."""
         return deep_get(self.__user_data, ["user", "apikey"])
 
@@ -362,7 +329,7 @@ class EWeLinkApiClient:
         return self.__at_updated_ts
 
     @property
-    def access_token(self) -> str | None:
+    def access_token(self) -> str:
         """Get at."""
         return deep_get(self.__user_data, ["at"])
 

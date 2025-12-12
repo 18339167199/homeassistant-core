@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -28,7 +30,7 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
         uiid = get_device_uiid(device.device)
         self.device_id = device_id
         self.uiid = uiid
-        self.uiid_instance = get_uiid_instance(uiid)
+        self.uiid_instance: Any = get_uiid_instance(uiid)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=device.device_name,
@@ -47,6 +49,6 @@ class EWeLinkEntity(CoordinatorEntity[EWeLinkDataCoordinator]):
         return device is not None and device.online
 
     @property
-    def ewelink_device(self):
+    def ewelink_device(self) -> EWeLinkDevice:
         """Get EWeLinkDevice instance."""
-        return self.coordinator.data.get(self.device_id)
+        return self.coordinator.data.get(self.device_id)  # type: ignore  # noqa: PGH003

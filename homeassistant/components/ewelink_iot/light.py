@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.light import (
-    ColorMode,
     DEFAULT_MAX_KELVIN,
     DEFAULT_MIN_KELVIN,
+    ColorMode,
     LightEntity,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -18,7 +18,6 @@ from .const import COORDINATOR, DOMAIN
 from .coordinator import EWeLinkDataCoordinator
 from .entity import EWeLinkEntity
 from .uiid import PLATFORM, get_uiid_instance
-from .utils import merge
 
 
 async def async_setup_entry(

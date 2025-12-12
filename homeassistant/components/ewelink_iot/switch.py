@@ -7,7 +7,6 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import COORDINATOR, DOMAIN
@@ -58,21 +57,8 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         """Initialize the switch."""
         super().__init__(coordinator, device_id)
         self.config = config
-        self.uiid_instance = get_uiid_instance(self.ewelink_device.uiid)
-        self.device_info = DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=self.ewelink_device.device_name,
-            manufacturer=self.ewelink_device.manufacturer,
-            model=self.ewelink_device.model,
-            serial_number=device_id,
-        )
         self._attr_unique_id = f"ewelink_lot_{device_id}_switch"
         self._attr_name = None  # Use device name
-
-    @property
-    def ewelink_device(self):
-        """Get EWeLinkDevice instance."""
-        return self.coordinator.data.get(self.device_id)
 
     @property
     def is_on(self) -> bool:

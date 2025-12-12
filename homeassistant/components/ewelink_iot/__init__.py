@@ -68,7 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         country_code=api_client.country_code,
     )
     await ws_client.start()
-    entry.async_on_unload(ws_client.stop)
+    entry.async_on_unload(ws_client.stop)  # type: ignore  # noqa: PGH003
 
     # Create coordinator
     coordinator = EWeLinkDataCoordinator(

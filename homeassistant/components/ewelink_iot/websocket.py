@@ -44,7 +44,7 @@ class EWeLinkWebSocketClient:
     ) -> None:
         """Initialize the WebSocket client."""
         self.__hass = hass
-        self.__session = session
+        self.__session: aiohttp.ClientSession = session
         self.__api_key = api_key
         self.__app_id = app_id
         self.__access_token = access_token
@@ -122,9 +122,7 @@ class EWeLinkWebSocketClient:
                 ws_address = await self.__get_ws_address()
                 _LOGGER.info("[EWeLink websocket] ws_address: %s", ws_address)
 
-                async with self.__session.ws_connect(
-                    ws_address, timeout=aiohttp.ClientTimeout(60), heartbeat=5
-                ) as ws:
+                async with self.__session.ws_connect(ws_address, heartbeat=5) as ws:
                     _LOGGER.info("[EWeLink websocket] connect success!")
                     self.__is_connected = True
                     self.__ws = ws
@@ -165,8 +163,6 @@ class EWeLinkWebSocketClient:
                 _LOGGER.error(err, "[EWeLink websocket] handshake failed")
             except (TimeoutError, aiohttp.ClientError) as err:
                 _LOGGER.error(err, "[EWeLink websocket] connect timeout")
-            except Exception as err:
-                _LOGGER.error(err, "[EWeLink websocket] other error happen")
 
             if self.__stop_event.is_set():
                 _LOGGER.info("[EWeLink websocket] stop event is set")
@@ -199,7 +195,6 @@ class EWeLinkWebSocketClient:
 
         if self.__session:
             await self.__session.close()
-            self.__session = None
 
         return True
 
@@ -231,8 +226,9 @@ class EWeLinkWebSocketClient:
             _LOGGER.info(
                 "[EWeLink websocket] control device send: %s", json.dumps(command)
             )
-            await self.__ws.send_json(command)
-            return await asyncio.wait_for(future, timeout=10)
+            if self.__ws is not None:
+                await self.__ws.send_json(command)
+                return await asyncio.wait_for(future, timeout=10)
         except TimeoutError:
             _LOGGER.error(
                 "[EWeLink websocket] control device timeout. sequence: %s; deviceid: %s; params: %s",
@@ -243,6 +239,8 @@ class EWeLinkWebSocketClient:
             if sequence in self.__pending_responses:
                 self.__pending_responses.pop(sequence)
             return {"error": 408, "sequence": sequence, "msg": "Request Timeout"}
+        else:
+            return None
 
     @property
     def is_connected(self) -> bool:

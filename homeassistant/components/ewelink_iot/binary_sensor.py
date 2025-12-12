@@ -1,4 +1,4 @@
-"""Binary sensor Platfom."""
+"""Binary sensor Platform."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import COORDINATOR, DOMAIN
@@ -40,7 +39,7 @@ async def async_setup_entry(
                 if config["platform"] == PLATFORM.BINARY_SENSOR
             ]
             for binary_sensor_config in binary_sensor_config_list:
-                ewelink_binary_sensor_entity = None
+                ewelink_binary_sensor_entity: EWeLinkBinarySensor | None = None
                 binary_sensor_type = binary_sensor_config.get("type")
                 if binary_sensor_type == BINARY_SENSOR_TYPE.DOOR:
                     ewelink_binary_sensor_entity = EWeLinkDoorBinarySensor(
@@ -61,23 +60,6 @@ class EWeLinkBinarySensor(EWeLinkEntity, BinarySensorEntity):
     """Representation of an EWeLink binary sensor."""
 
     _attr_has_entity_name = True
-
-    def __init__(self, coordinator: EWeLinkDataCoordinator, device_id: str) -> None:
-        """Init the binary sensor."""
-        super().__init__(coordinator, device_id)
-        self.uiid_instance = get_uiid_instance(self.ewelink_device.uiid)
-        self.device_info = DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=self.ewelink_device.device_name,
-            manufacturer=self.ewelink_device.manufacturer,
-            model=self.ewelink_device.model,
-            serial_number=device_id,
-        )
-
-    @property
-    def ewelink_device(self):
-        """Get EWeLinkDevice instance."""
-        return self.coordinator.data.get(self.device_id)
 
 
 class EWeLinkDoorBinarySensor(EWeLinkBinarySensor):

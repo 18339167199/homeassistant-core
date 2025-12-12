@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 import logging
 import numbers
+from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -39,7 +40,7 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
         self.api_client = api_client
         self.ws_client = ws_client
         self.data = {}
-        self.event_handler_map = {}
+        self.event_handler_map: dict[str, Callable] = {}
 
     def add_event_handler(self, key, handler):
         """Add event entity handler."""
@@ -68,19 +69,22 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
 
     def update_entity_state(self, device_id, params):
         """Update entity state."""
-        device = self.data.get(device_id)
-        uiid = get_device_uiid(device.device)
-        if device is None or uiid is None:
+        ewelink_device = self.data.get(device_id)
+        if ewelink_device is None:
             return
 
-        uiid_instance = get_uiid_instance(uiid)
+        uiid = get_device_uiid(ewelink_device.device)
+        if uiid is None:
+            return
+
+        uiid_instance: Any = get_uiid_instance(uiid)
         if (
             uiid_instance
             and hasattr(uiid_instance, "event_types")
             and isinstance(uiid_instance.event_types, list)
             and len(uiid_instance.event_types) > 0
         ):
-            outlet = deep_get(params, ["outlet"], 0)
+            outlet: int = deep_get(params, ["outlet"], 0)
             key = deep_get(params, ["key"])
             if isinstance(outlet, numbers.Number) and isinstance(key, numbers.Number):
                 handler_key = gen_event_callback_key(device_id, outlet)
@@ -88,7 +92,7 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
                 if event_handler is not None:
                     event_handler(outlet, key)
 
-        merge(device.device, {"itemData": {"params": params}})
+        merge(ewelink_device.device, {"itemData": {"params": params}})
         self.async_set_updated_data(self.data)
 
     async def control_device(self, ewelink_device: EWeLinkDevice, params: dict):

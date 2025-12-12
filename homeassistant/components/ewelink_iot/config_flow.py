@@ -146,7 +146,7 @@ class EWeLinkConfigFlow(ConfigFlow, domain=DOMAIN):
                 # re login with user account
                 user_data = await api_client.login()
 
-                old_user_input = reauth_entry.data.get("user_input")
+                old_user_input: dict[str, Any] = reauth_entry.data.get("user_input", {})
                 new_user_input = {
                     CONF_ACCOUNT: old_user_input.get(CONF_ACCOUNT),
                     CONF_REGION: old_user_input.get(CONF_REGION),
