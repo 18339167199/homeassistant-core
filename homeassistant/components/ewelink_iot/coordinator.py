@@ -64,7 +64,10 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
         """Set up the coordinator, do initial data fetch."""
         await self.async_config_entry_first_refresh()
         self.ws_client.set_coordinator_handler(
-            {"update_entity_state": self.update_entity_state}
+            {
+                "update_entity_state": self.update_entity_state,
+                "update_entity_available": self.update_entity_available,
+            }
         )
 
     def update_entity_state(self, device_id, params):
@@ -93,6 +96,14 @@ class EWeLinkDataCoordinator(DataUpdateCoordinator[dict[str, EWeLinkDevice]]):
                     event_handler(outlet, key)
 
         merge(ewelink_device.device, {"itemData": {"params": params}})
+        self.async_set_updated_data(self.data)
+
+    def update_entity_available(self, device_id, online):
+        """Update entity available."""
+        ewelink_device = self.data.get(device_id)
+        if ewelink_device is None:
+            return
+        merge(ewelink_device.device, {"itemData": {"online": bool(online)}})
         self.async_set_updated_data(self.data)
 
     async def control_device(self, ewelink_device: EWeLinkDevice, params: dict):

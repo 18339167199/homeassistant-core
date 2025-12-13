@@ -50,6 +50,7 @@ DEVICE_TYPE_SWITCH: Final = "switch"
 WS_MSG_TYPE_HANDSHAKE: Final = "handshake"
 WS_MSG_ACTION: Final = "action"
 WS_MSG_ACTION_UPDATE: Final = "update"
+WS_MSG_ACTION_SYSMSG: Final = "sysmsg"
 WS_MSG_ACTION_USER_ONLINE: Final = "userOnline"
 WS_USER_AGENT: Final = "pc_ewelink"
 

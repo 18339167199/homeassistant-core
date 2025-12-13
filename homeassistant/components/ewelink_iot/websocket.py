@@ -21,6 +21,7 @@ from .const import (
     REGION_CN,
     REGIONS_MAP,
     WS_MSG_ACTION,
+    WS_MSG_ACTION_SYSMSG,
     WS_MSG_ACTION_UPDATE,
     WS_MSG_ACTION_USER_ONLINE,
     WS_USER_AGENT,
@@ -53,7 +54,7 @@ class EWeLinkWebSocketClient:
         self.__ws = None
         self.__is_connected = False
         self.__reconnect_delay_time = 5
-        self.__hass_task = None  # asyncio.Task
+        self.__hass_task = None
         self.__stop_event = asyncio.Event()
         self.__coordinator_handler = {}
         self.__pending_responses: dict[str, asyncio.Future] = {}
@@ -97,16 +98,24 @@ class EWeLinkWebSocketClient:
             if action == WS_MSG_ACTION_UPDATE:
                 deviceid = ws_message_json.get("deviceid")
                 params = ws_message_json.get("params")
-                if (
-                    deviceid is not None
-                    and params is not None
-                    and self.__coordinator_handler is not None
-                ):
+                if deviceid is not None and params is not None:
                     update_entity_state = self.__coordinator_handler.get(
                         "update_entity_state"
                     )
                     if update_entity_state is not None:
                         update_entity_state(deviceid, params)
+            elif action == WS_MSG_ACTION_SYSMSG:
+                deviceid = ws_message_json.get("deviceid")
+                params = ws_message_json.get("params")
+                if deviceid is None or params is None:
+                    return
+                if "online" in params:
+                    update_entity_available = self.__coordinator_handler.get(
+                        "update_entity_available"
+                    )
+                    if update_entity_available is not None:
+                        update_entity_available(deviceid, params.get("online"))
+
         except json.JSONDecodeError as err:
             _LOGGER.error(err, "[EWeLink websocket] handle_ws_message error happen")
 
