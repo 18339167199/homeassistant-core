@@ -202,8 +202,8 @@ class EWeLinkWebSocketClient:
         except asyncio.CancelledError:
             pass
 
-        if self.__session:
-            await self.__session.close()
+        # if self.__session:
+        #     await self.__session.close()
 
         return True
 

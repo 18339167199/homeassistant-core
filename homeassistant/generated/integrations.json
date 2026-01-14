@@ -1909,6 +1909,12 @@
       "config_flow": true,
       "iot_class": "cloud_push"
     },
+    "sonoff": {
+      "name": "SonoffLAN",
+      "integration_type": "hub",
+      "config_flow": true,
+      "iot_class": "cloud_push"
+    },
     "ezviz": {
       "name": "EZVIZ",
       "integration_type": "hub",
