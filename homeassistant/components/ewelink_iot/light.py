@@ -107,7 +107,7 @@ class EWeLinkLight(EWeLinkEntity, LightEntity):
     @property
     def is_on(self) -> bool:
         """Light is on."""
-        return self.uiid_instance.get_switch_state(self.ewelink_device.device)
+        return self.uiid_instance.get_switch_value(self.ewelink_device.device)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""

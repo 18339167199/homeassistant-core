@@ -65,7 +65,7 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         """Return true if switch is on."""
         if not self.ewelink_device or not self.uiid_instance:
             return False
-        return self.uiid_instance.get_switch_state(self.ewelink_device.device)
+        return self.uiid_instance.get_switch_value(self.ewelink_device.device)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
@@ -83,11 +83,3 @@ class EWeLinkSwitch(EWeLinkEntity, SwitchEntity):
         result = await self.coordinator.control_device(self.ewelink_device, params)
         if result is not None and result.get("error") == 0:
             self._async_write_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        """When entity is added to hass."""
-        await super().async_added_to_hass()
-
-    async def async_will_remove_from_hass(self) -> None:
-        """When entity will be removed from hass."""
-        await super().async_will_remove_from_hass()
